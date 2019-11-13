@@ -13,15 +13,10 @@ import (
 )
 
 // SetupAgent start an SSH Agent server and loads the given private key
-func SetupAgent(privateKeyBytes []byte, passphrase string) (sshAuthSock string, error error) {
+func SetupAgent(privateKey interface{}) (sshAuthSock string, error error) {
 	sshAgent := agent.NewKeyring()
 
-	privateKey, err := parsePrivateSSHKey(privateKeyBytes, passphrase)
-	if err != nil {
-		return "", err
-	}
-
-	err = sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
+	err := sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
 	if err != nil {
 		return "", err
 	}
@@ -68,7 +63,8 @@ func generateRandomString(n int) string {
 	return string(b)
 }
 
-func parsePrivateSSHKey(privateKeyBytes []byte, passphrase string) (interface{}, error) {
+// ParsePrivateSSHKey parses a private key
+func ParsePrivateSSHKey(privateKeyBytes []byte, passphrase string) (interface{}, error) {
 	var err error
 	var privateKey interface{}
 	if strings.Contains(string(privateKeyBytes), "ENCRYPTED") {
