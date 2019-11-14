@@ -19,15 +19,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.version
 # Production image
 FROM gcr.io/cloud-builders/docker as production
 
-ARG SSH_KEY_PATH=/build.pem
-
 WORKDIR /app
 
 COPY --from=builder /app/auth-wrapper /opt/auth-wrapper
-
-COPY build.pem /
-RUN chmod 600 /build.pem
-
-ENV SSH_KEY_PATH=${SSH_KEY_PATH}
 
 ENTRYPOINT [ "/opt/auth-wrapper", "docker" ]

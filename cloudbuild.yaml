@@ -1,11 +1,4 @@
 steps:
-  # Copy build key to workspace
-  - name: 'gcr.io/cloud-builders/gsutil'
-    args: [
-            'cp',
-            'gs://connectedcars-staging-cloudbuilder-private/build.pem',
-            '.'
-          ]
   # Pull a modern version of docker
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'gcr.io/cloud-builders/docker:latest']
@@ -17,25 +10,35 @@ steps:
   # Check version
   - name: 'gcr.io/cloud-builders/docker'
     args: ['version']
-  # Build cloud build wrapper
+  # Build auth wrapper image
   - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
-    args: ['-c', 'docker build --network cloudbuild --tag="gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA" --tag="gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest" --file=Dockerfile .']
-  # Test cloud build wrapper using ssh key embedded in the container
-  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA'
-    args: ['build', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
-    dir: 'testdata'
-    secretEnv:
-      - 'SSH_KEY_PASSWORD'
-    env:
-      - "PROGRESS_NO_TRUNC=1"
-      - "DOCKER_BUILDKIT=1"
+    args: ['build', '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest', '.']
   # Test cloud build wrapper using KSM key
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA'
     args: ['build', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
     dir: 'testdata'
     env:
       - "SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3"
+      - "PROGRESS_NO_TRUNC=1"
+      - "DOCKER_BUILDKIT=1"
+  # Copy build key to workspace
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: [
+            'cp',
+            'gs://connectedcars-staging-cloudbuilder-private/build.pem',
+            '.'
+          ]
+  # Build auth wrapper image with embedded key
+  - name: 'gcr.io/cloud-builders/docker'
+    dir: localkey
+    args: ['build', '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-pemkey.$BRANCH_NAME:$COMMIT_SHA', '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-pemkey.$BRANCH_NAME:latest', '.']
+  # Test cloud build wrapper using ssh key embedded in the container
+  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-pemkey.$BRANCH_NAME:$COMMIT_SHA'
+    args: ['build', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
+    dir: 'testdata'
+    secretEnv:
+      - 'SSH_KEY_PASSWORD'
+    env:
       - "PROGRESS_NO_TRUNC=1"
       - "DOCKER_BUILDKIT=1"
 secrets:
