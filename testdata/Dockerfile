@@ -1,5 +1,5 @@
 # syntax = docker/dockerfile:experimental
-FROM ubuntu as builder
+FROM ubuntu:19.10 as builder
 
 # Test ssh key injection
 RUN apt-get update -qq && \

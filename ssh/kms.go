@@ -59,7 +59,7 @@ func (kmss *KMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpt
 	// Query the API.
 	res, err := kmss.client.AsymmetricSign(kmss.ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("%v\nhash: %v", err, hashLookup[opts.HashFunc()])
+		return nil, fmt.Errorf("%v\nrequested hash: %v", err, hashLookup[opts.HashFunc()])
 	}
 
 	return res.Signature, nil
