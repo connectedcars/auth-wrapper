@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -20,6 +21,7 @@ type KMSSigner struct {
 	client    *cloudkms.KeyManagementClient
 	keyName   string
 	publicKey crypto.PublicKey
+	digest    crypto.Hash
 }
 
 var hashLookup = map[crypto.Hash]string{
@@ -45,15 +47,36 @@ var hashLookup = map[crypto.Hash]string{
 
 // Sign with key
 func (kmss *KMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+	// Check opts to see if the digest algo matches
+	if opts.HashFunc() != kmss.digest {
+		return nil, fmt.Errorf("Requested hash: %v, supported hash %v", hashLookup[opts.HashFunc()], hashLookup[kmss.digest])
+	}
+
 	// Build the request.
-	// TODO: Check opts to see if the digest algo matches
-	req := &kmspb.AsymmetricSignRequest{
-		Name: kmss.keyName,
-		Digest: &kmspb.Digest{
+	var digestPayload kmspb.Digest
+	switch kmss.digest {
+	case crypto.SHA256:
+		digestPayload = kmspb.Digest{
+			Digest: &kmspb.Digest_Sha256{
+				Sha256: digest,
+			},
+		}
+	case crypto.SHA384:
+		digestPayload = kmspb.Digest{
+			Digest: &kmspb.Digest_Sha384{
+				Sha384: digest,
+			},
+		}
+	case crypto.SHA512:
+		digestPayload = kmspb.Digest{
 			Digest: &kmspb.Digest_Sha512{
 				Sha512: digest,
 			},
-		},
+		}
+	}
+	req := &kmspb.AsymmetricSignRequest{
+		Name:   kmss.keyName,
+		Digest: &digestPayload,
 	}
 
 	// Query the API.
@@ -90,10 +113,39 @@ func NewKMSSigner(keyName string) (signer crypto.Signer, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("x509.ParsePKIXPublicKey: %+v", err)
 	}
-	rsaKey, ok := abstractKey.(*rsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("key %q is not RSA", keyName)
+
+	var publicKey crypto.PublicKey
+	var digestType crypto.Hash
+	switch abstractKey.(type) {
+	case *rsa.PublicKey:
+		publicKey = abstractKey.(*rsa.PublicKey)
+		keySize := publicKey.(*rsa.PublicKey).Size() * 8
+		switch keySize {
+		case 2048:
+			fallthrough
+		case 3072:
+			digestType = crypto.SHA256
+		case 4096:
+			digestType = crypto.SHA512
+		default:
+			return nil, fmt.Errorf("unsupported RSA key size %v", keySize)
+		}
+
+	case *ecdsa.PublicKey:
+		publicKey = abstractKey.(*ecdsa.PublicKey)
+		bitSize := publicKey.(*ecdsa.PublicKey).Curve.Params().BitSize
+		switch bitSize {
+		case 256:
+			digestType = crypto.SHA256
+		case 384:
+			digestType = crypto.SHA384
+		default:
+			return nil, fmt.Errorf("unsupported ECDSA bit size %v", bitSize)
+		}
+
+	default:
+		return nil, fmt.Errorf("key %q is not supported format", keyName)
 	}
 
-	return &KMSSigner{keyName: keyName, ctx: ctx, client: client, publicKey: rsaKey}, nil
+	return &KMSSigner{keyName: keyName, ctx: ctx, client: client, publicKey: publicKey, digest: digestType}, nil
 }
