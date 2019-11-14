@@ -56,6 +56,12 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 		}
 		fmt.Printf("Setting SSH_AUTH_SOCK using ssh key: %s", sshKeyPath)
 		os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
+
+		// Do string replacement for SSH_AUTH_SOCK
+		for i, arg := range args {
+			args[i] = strings.ReplaceAll(arg, "$SSH_AUTH_SOCK", sshAuthSock)
+		}
+
 	}
 
 	cmd := exec.Command(command, args...)
