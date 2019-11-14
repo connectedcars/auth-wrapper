@@ -9,7 +9,8 @@ WORKDIR /app
 
 RUN go version
 
-RUN go test ./...
+# Needs access to a google token
+#RUN go test ./...
 
 ENV GO111MODULE=on
 
