@@ -8,7 +8,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'docker/dockerfile:1.0-experimental']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'docker:19.10']
+    args: ['pull', 'ubuntu:19.10']
   # Check version
   - name: 'gcr.io/cloud-builders/docker'
     args: ['version']
