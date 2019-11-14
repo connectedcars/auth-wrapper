@@ -23,7 +23,7 @@ steps:
     args: ['-c', 'docker build --tag="gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA" --tag="gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest" --file=Dockerfile .']
   # Test cloud build wrapper using ssh key embedded in the container
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA'
-    args: ['build', '--progress=plain', '--ssh=default=$SSH_AUTH_SOCK', '.']
+    args: ['build', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
     dir: 'testdata'
     secretEnv:
       - 'SSH_KEY_PASSWORD'
@@ -32,7 +32,7 @@ steps:
       - "DOCKER_BUILDKIT=1"
   # Test cloud build wrapper using KSM key
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA'
-    args: ['build', '--progress=plain', '--ssh=default=$SSH_AUTH_SOCK', '.']
+    args: ['build', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
     dir: 'testdata'
     env:
       - "SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3"
