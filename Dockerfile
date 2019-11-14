@@ -14,7 +14,7 @@ RUN go version
 
 ENV GO111MODULE=on
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags "-X 'main.versionString=$VERSION'" ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.versionString=$VERSION'" ./cmd
 
 # Production image
 FROM gcr.io/cloud-builders/docker as production
@@ -23,7 +23,7 @@ ARG SSH_KEY_PATH=/build.pem
 
 WORKDIR /app
 
-COPY --from=builder /app/cmd /opt/auth-wrapper
+COPY --from=builder /app/auth-wrapper /opt/auth-wrapper
 
 COPY build.pem /
 RUN chmod 600 /build.pem
