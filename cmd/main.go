@@ -21,11 +21,14 @@ func main() {
 	command := os.Args[1]
 	args := os.Args[2:]
 
-	exitCode := runWithSSHAgent(command, args, sshKeyPath, sshKeyPassword)
+	exitCode, err := runWithSSHAgent(command, args, sshKeyPath, sshKeyPassword)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+	}
 	os.Exit(exitCode)
 }
 
-func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPassword string) (exitCode int) {
+func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPassword string) (exitCode int, err error) {
 	if sshKeyPath != "" {
 		var privateKey interface{}
 		if strings.HasPrefix(sshKeyPath, "kms://") {
@@ -33,28 +36,24 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 			kmsKeyPath := sshKeyPath[6:]
 			privateKey, err = ssh.NewKMSSigner(kmsKeyPath)
 			if err != nil {
-				fmt.Printf("Failed to setup KMSSigner %s: %v\n", kmsKeyPath, err)
-				return 1
+				return 1, fmt.Errorf("Failed to setup KMSSigner %s: %v", kmsKeyPath, err)
 			}
 		} else {
 			privateKeyBytes, err := ioutil.ReadFile(sshKeyPath)
 			if err != nil {
-				fmt.Printf("Failed to read SSHPrivateKey from %s: %v\n", sshKeyPath, err)
-				return 1
+				return 1, fmt.Errorf("Failed to read SSHPrivateKey from %s: %v", sshKeyPath, err)
 			}
 			privateKey, err = ssh.ParsePrivateSSHKey(privateKeyBytes, sshKeyPassword)
 			if err != nil {
-				fmt.Printf("Failed to read SSHPrivateKey from %s: %v\n", sshKeyPath, err)
-				return 1
+				return 1, fmt.Errorf("Failed to read SSHPrivateKey from %s: %v", sshKeyPath, err)
 			}
 		}
 
 		sshAuthSock, err := ssh.SetupAgent(privateKey)
 		if err != nil {
-			fmt.Printf("Failed to start ssh agent server: %v\n", err)
-			return 1
+			return 1, fmt.Errorf("Failed to start ssh agent server: %v", err)
 		}
-		fmt.Printf("Setting SSH_AUTH_SOCK using ssh key: %s", sshKeyPath)
+		fmt.Fprintf(os.Stderr, "Setting SSH_AUTH_SOCK using ssh key: %s\n", sshKeyPath)
 		os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
 
 		// Do string replacement for SSH_AUTH_SOCK
@@ -70,26 +69,22 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 	cmd.Stderr = os.Stderr
 
 	if len(os.Args) < 2 {
-		fmt.Println("auth-wrapper cmd args")
-		return 1
+		return 1, fmt.Errorf("auth-wrapper cmd args")
 	}
 
 	if err := cmd.Start(); err != nil {
-		fmt.Printf("cmd.Start: %v\n", err)
-		return 1
+		return 1, fmt.Errorf("cmd.Start: %v", err)
 	}
 
-	err := cmd.Wait()
+	err = cmd.Wait()
 	if err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				return status.ExitStatus()
+				return status.ExitStatus(), nil
 			}
-			fmt.Printf("Failed to get status code: %v\n", err)
-			return 1
+			return 1, fmt.Errorf("Failed to get status code: %v", err)
 		}
-		fmt.Printf("cmd.Wait: %v\n", err)
-		return 1
+		return 1, fmt.Errorf("cmd.Wait: %v", err)
 	}
-	return 0
+	return 0, nil
 }
