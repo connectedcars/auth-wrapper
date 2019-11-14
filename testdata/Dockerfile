@@ -9,4 +9,6 @@ RUN apt-get update -qq && \
 
 RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 
+ENV GIT_SSH_COMMAND="ssh -vvvv"
+
 RUN --mount=type=ssh,required=true export && git clone git@github.com:connectedcars/private-module.git
