@@ -37,7 +37,11 @@ func (kmss *KMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpt
 
 	// Query the API.
 	res, err := kmss.client.AsymmetricSign(kmss.ctx, req)
-	return res.Signature, err
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Signature, nil
 }
 
 // Public fetches public key
