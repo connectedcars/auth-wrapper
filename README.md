@@ -2,7 +2,7 @@
 
 Simple wrapper that exposes an ssh-agent to all sub processes using keys from Google Cloud KMS or OpenSSH pem formated key.
 
-This can fx. be used in CI/CD pipelines when checking code out, running package installers pulling code from private repos.
+This can fx be used in CI/CD pipelines when checking code out, running package installers pulling code from private repos.
 
 ## How to use
 
@@ -46,6 +46,40 @@ steps:
 images: ['gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME']
 ```
 
-## Google Cloud KMS
+Git clone with local key:
 
+``` bash
+export SSH_KEY_PATH=build.pem
+export SSH_KEY_PASSWORD=thepassword
+auth-wrapper git clone git@github.com:connectedcars/private-module.git
+```
 
+## Google Cloud KMS key setup
+
+Create keyring and key:
+
+``` bash
+# Create keyring for cloud build keys
+gcloud kms keyrings create --location global cloudbuild
+# It needs to be be SHA512 as the ssh client seems to default to this hashing algorithm and KMS pairs key size and hashing algorithms for some reason.
+gcloud kms keys create ssh-key --keyring cloudbuilder --location global --default-algorithm rsa-sign-pkcs1-4096-sha512 --purpose asymmetric-signing
+# Give cloud build access to use the key
+gcloud kms keys add-iam-policy-binding ssh-key --keyring=cloudbuilder --location=global --member serviceAccount:projectserviceaccount@cloudbuild.gserviceaccount.com --role roles/cloudkms.signerVerifier
+```
+
+Extract public key and convert to ssh format:
+
+``` bash
+gcloud kms keys versions get-public-key 1 --key ssh-key --keyring=cloudbuilder --location=global > ssh-key.pem
+# Copy the output to a github user
+ssh-keygen -f ssh-key.pem -i -mPKCS8
+```
+
+## Local key
+
+Current the go ssh key implementation does not support the new OpenSSH format so you need to use a PEM formated key:
+
+``` bash
+ssh-keygen -f build.key
+ssh-keygen -f build.key -m 'PEM' -e > build.pem
+```
