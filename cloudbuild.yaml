@@ -47,4 +47,7 @@ secrets:
 - kmsKeyName: projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/connectedcars-builder
   secretEnv:
     SSH_KEY_PASSWORD: CiQAg7wCPfO2Tf9mtZoFWjAtX7whQ481af3gyGdM9WNK26B74UkSUQBefMgeHNh0KTsGybKReXDsFcbmed7f5sw97zSe9cswpKogENM5Ye0jiIu6NfebUpCnmJ9HVHmD/yBknlW4nn1VXBs7HYGiBSFZ52i2HyEopw==
-images: ['gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME']
+images: [
+  'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME',
+  'gcr.io/$PROJECT_ID/$REPO_NAME-pemkey.$BRANCH_NAME'
+]
