@@ -49,6 +49,7 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 			}
 		}
 
+		// TODO: Change interface so we give a Agent instead
 		sshAuthSock, err := ssh.SetupAgent(privateKey)
 		if err != nil {
 			return 1, fmt.Errorf("Failed to start ssh agent server: %v", err)

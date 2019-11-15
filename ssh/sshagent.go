@@ -12,13 +12,23 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
+type readOnlyAgent struct {
+	agent.Agent
+}
+
 // SetupAgent start an SSH Agent server and loads the given private key
 func SetupAgent(privateKey interface{}) (sshAuthSock string, error error) {
-	sshAgent := agent.NewKeyring()
-
-	err := sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
-	if err != nil {
-		return "", err
+	// TODO: Move outside function
+	var sshAgent agent.Agent
+	switch privateKey.(type) {
+	case *KMSSigner:
+		sshAgent = NewKMSKeyring(privateKey.(*KMSSigner))
+	default:
+		sshAgent = agent.NewKeyring()
+		err := sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// Generate random filename
