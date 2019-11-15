@@ -28,7 +28,7 @@ steps:
     args: [
             'cp',
             'gs://connectedcars-staging-cloudbuilder-private/build.pem',
-            '.'
+            './localkey'
           ]
   # Build auth wrapper image with embedded key
   - name: 'gcr.io/cloud-builders/docker'
