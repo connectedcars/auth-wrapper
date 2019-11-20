@@ -1,4 +1,4 @@
-package ssh
+package sshagent
 
 import (
 	"io/ioutil"
@@ -12,25 +12,8 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-type readOnlyAgent struct {
-	agent.Agent
-}
-
-// SetupAgent start an SSH Agent server and loads the given private key
-func SetupAgent(privateKey interface{}) (sshAuthSock string, error error) {
-	// TODO: Move outside function
-	var sshAgent agent.Agent
-	switch privateKey.(type) {
-	case *KMSSigner:
-		sshAgent = NewKMSKeyring(privateKey.(*KMSSigner))
-	default:
-		sshAgent = agent.NewKeyring()
-		err := sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
-		if err != nil {
-			return "", err
-		}
-	}
-
+// StartSSHAgentServer start an SSH Agent server and loads the given private key
+func StartSSHAgentServer(sshAgent agent.Agent) (sshAuthSock string, error error) {
 	// Generate random filename
 	dir, err := ioutil.TempDir(os.TempDir(), "")
 	if err != nil {
@@ -55,7 +38,6 @@ func SetupAgent(privateKey interface{}) (sshAuthSock string, error error) {
 			if err != nil {
 				log.Fatal("accept error:", err)
 			}
-
 			go agent.ServeAgent(sshAgent, conn)
 		}
 	}()

@@ -8,7 +8,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/connectedcars/auth-wrapper/ssh"
+	"github.com/connectedcars/auth-wrapper/sshagent"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 func main() {
@@ -29,28 +30,33 @@ func main() {
 }
 
 func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPassword string) (exitCode int, err error) {
+	var sshAgent agent.Agent
 	if sshKeyPath != "" {
-		var privateKey interface{}
 		if strings.HasPrefix(sshKeyPath, "kms://") {
 			var err error
 			kmsKeyPath := sshKeyPath[6:]
-			privateKey, err = ssh.NewKMSSigner(kmsKeyPath)
+			sshAgent, err = sshagent.NewKMSKeyring(kmsKeyPath)
 			if err != nil {
-				return 1, fmt.Errorf("Failed to setup KMSSigner %s: %v", kmsKeyPath, err)
+				return 1, fmt.Errorf("Failed to setup KMS Keyring %s: %v", kmsKeyPath, err)
 			}
 		} else {
+			var privateKey interface{}
 			privateKeyBytes, err := ioutil.ReadFile(sshKeyPath)
 			if err != nil {
 				return 1, fmt.Errorf("Failed to read SSHPrivateKey from %s: %v", sshKeyPath, err)
 			}
-			privateKey, err = ssh.ParsePrivateSSHKey(privateKeyBytes, sshKeyPassword)
+			privateKey, err = sshagent.ParsePrivateSSHKey(privateKeyBytes, sshKeyPassword)
 			if err != nil {
 				return 1, fmt.Errorf("Failed to read SSHPrivateKey from %s: %v", sshKeyPath, err)
 			}
+			sshAgent = agent.NewKeyring()
+			err = sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
+			if err != nil {
+				return 1, err
+			}
 		}
 
-		// TODO: Change interface so we give a Agent instead
-		sshAuthSock, err := ssh.SetupAgent(privateKey)
+		sshAuthSock, err := sshagent.StartSSHAgentServer(sshAgent)
 		if err != nil {
 			return 1, fmt.Errorf("Failed to start ssh agent server: %v", err)
 		}
