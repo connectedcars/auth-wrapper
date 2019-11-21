@@ -46,7 +46,7 @@ steps:
       - "DOCKER_BUILDKIT=1"
   # Test auth wrapped git using KSM key
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA'
-    args: ['git', 'clone', 'git@github.com:connectedcars/private-module.git']
+    args: ['clone', 'git@github.com:connectedcars/private-module.git']
   #
   # Build embedded key auth wrappers
   #
