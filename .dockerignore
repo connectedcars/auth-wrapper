@@ -1,3 +1,8 @@
 .vscode
 auth-wrapper
 Dockerfile
+README.md
+LICENSE
+cloudbuild.yaml
+.git
+.gitignore

@@ -29,6 +29,9 @@ ENV WRAP_COMMAND=${WRAP_COMMAND}
 ARG SSH_KEY_PATH
 ENV SSH_KEY_PATH=${SSH_KEY_PATH}
 
+# Used by git image
+ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
 COPY --from=builder /app/auth-wrapper /opt/auth-wrapper
 
 ENTRYPOINT ["/opt/auth-wrapper"]
