@@ -23,18 +23,17 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.version
 # Production image
 FROM ${WRAP_IMAGE} as production
 
-COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
-
 ARG WRAP_COMMAND
-ENV WRAP_COMMAND=${WRAP_COMMAND}
-
+ARG WRAP_NAME
 ARG SSH_KEY_PATH
-ENV SSH_KEY_PATH=${SSH_KEY_PATH}
+
+COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
+RUN ln -s /opt/bin/auth-wrapper /opt/bin/${WRAP_NAME}
 
 # Used by git image
 ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
-RUN ln -s /opt/bin/auth-wrapper /opt/bin/${WRAP_COMMAND}
 ENV PATH=/opt/bin:${PATH}
-
-ENTRYPOINT ["/opt/auth-wrapper"]
+ENV WRAP_COMMAND=${WRAP_COMMAND}
+ENV SSH_KEY_PATH=${SSH_KEY_PATH}
+ENTRYPOINT ["/opt/bin/auth-wrapper"]
