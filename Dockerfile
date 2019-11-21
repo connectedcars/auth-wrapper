@@ -24,6 +24,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.version
 FROM ${WRAP_IMAGE} as production
 
 ARG WRAP_ENTRYPOINT
+ENV WRAP_ENTRYPOINT=${WRAP_ENTRYPOINT}
+
 ARG SSH_KEY_PATH
 ENV SSH_KEY_PATH=${SSH_KEY_PATH}
 
