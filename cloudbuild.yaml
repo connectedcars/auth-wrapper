@@ -20,7 +20,7 @@ steps:
     args: [
       'build',
       '--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/git',
-      '--build-arg=WRAP_ENTRYPOINT=git',
+      '--build-arg=WRAP_COMMAND=git',
       '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:latest', 
@@ -31,7 +31,7 @@ steps:
     args: [
       'build',
       '--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/docker',
-      '--build-arg=WRAP_ENTRYPOINT=docker',
+      '--build-arg=WRAP_COMMAND=docker',
       '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:latest', 

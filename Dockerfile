@@ -1,5 +1,5 @@
 ARG WRAP_IMAGE
-ARG WRAP_ENTRYPOINT
+ARG WRAP_COMMAND
 ARG SSH_KEY_PATH
 
 # Build image
@@ -23,12 +23,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.version
 # Production image
 FROM ${WRAP_IMAGE} as production
 
-ARG WRAP_ENTRYPOINT
-ENV WRAP_ENTRYPOINT=${WRAP_ENTRYPOINT}
+ARG WRAP_COMMAND
+ENV WRAP_COMMAND=${WRAP_COMMAND}
 
 ARG SSH_KEY_PATH
 ENV SSH_KEY_PATH=${SSH_KEY_PATH}
 
 COPY --from=builder /app/auth-wrapper /opt/auth-wrapper
 
-ENTRYPOINT [ "/opt/auth-wrapper", "${WRAP_ENTRYPOINT}" ]
+ENTRYPOINT ["/opt/auth-wrapper"]

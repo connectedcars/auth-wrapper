@@ -18,9 +18,21 @@ func main() {
 	os.Unsetenv("SSH_KEY_PATH")
 	os.Unsetenv("SSH_KEY_PASSWORD")
 
-	// Setup exec command
-	command := os.Args[1]
-	args := os.Args[2:]
+	var command string
+	var args []string
+	wrapCommand := os.Getenv("WRAP_COMMAND")
+	if wrapCommand != "" {
+		command = wrapCommand
+		args = os.Args[1:]
+	} else {
+		if len(os.Args) < 2 {
+			fmt.Fprintf(os.Stderr, "auth-wrapper cmd args")
+			os.Exit(1)
+		}
+		// Setup exec command
+		command = os.Args[1]
+		args = os.Args[2:]
+	}
 
 	exitCode, err := runWithSSHAgent(command, args, sshKeyPath, sshKeyPassword)
 	if err != nil {
@@ -76,10 +88,6 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
-	if len(os.Args) < 2 {
-		return 1, fmt.Errorf("auth-wrapper cmd args")
-	}
 
 	if err := cmd.Start(); err != nil {
 		return 1, fmt.Errorf("cmd.Start: %v", err)
