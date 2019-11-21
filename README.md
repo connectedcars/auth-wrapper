@@ -55,6 +55,14 @@ export SSH_KEY_PASSWORD=thepassword
 auth-wrapper git clone git@github.com:connectedcars/private-module.git
 ```
 
+## Options
+
+Environment variables:
+
+* SSH_KEY_PATH: Path to SSH key, can be OpenSSH PEM formated key or a url to KMS key
+* SSH_KEY_PASSWORD: Password to key, only used by PEM formated key
+* WRAP_COMMAND: Command to run with the arguments to auth-wrapper
+
 ## Google Cloud KMS key setup
 
 Create keyring and key:
