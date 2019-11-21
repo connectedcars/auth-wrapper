@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -18,11 +19,29 @@ func main() {
 	os.Unsetenv("SSH_KEY_PATH")
 	os.Unsetenv("SSH_KEY_PASSWORD")
 
+	processName := filepath.Base(os.Args[0])
+
 	var command string
 	var args []string
 	wrapCommand := os.Getenv("WRAP_COMMAND")
 	if wrapCommand != "" {
 		command = wrapCommand
+		args = os.Args[1:]
+	} else if processName != "auth-wrapper" && processName != "__debug_bin" {
+		// Get executable path
+		ex, err := os.Executable()
+		if err != nil {
+			panic(err)
+		}
+		processPath := filepath.Dir(ex)
+
+		// Remove wrapper location path
+		currentPath := os.Getenv("PATH")
+		cleanedPath := strings.Replace(currentPath, processPath+"/:", "", 1)
+		cleanedPath = strings.Replace(cleanedPath, processPath+":", "", 1)
+		os.Setenv("PATH", cleanedPath)
+
+		command = processName
 		args = os.Args[1:]
 	} else {
 		if len(os.Args) < 2 {

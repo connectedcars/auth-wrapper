@@ -15,12 +15,14 @@ steps:
   #
   # Build KMS auth wrappers
   #
+  # TODO: Move to own Dockerfile's, this is getting a bit too fancy
   # Build auth wrapped git
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
       '--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/git',
-      '--build-arg=WRAP_COMMAND=git',
+      '--build-arg=WRAP_COMMAND=/usr/bin/git',
+      '--build-arg=WRAP_NAME=git',
       '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:latest', 
@@ -31,7 +33,8 @@ steps:
     args: [
       'build',
       '--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/docker',
-      '--build-arg=WRAP_COMMAND=docker',
+      '--build-arg=WRAP_COMMAND=/usr/bin/docker',
+      '--build-arg=WRAP_NAME=docker',
       '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:latest', 
