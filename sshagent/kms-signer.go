@@ -1,4 +1,4 @@
-package ssh
+package sshagent
 
 import (
 	"context"
@@ -26,7 +26,8 @@ type KMSSigner struct {
 	digest       crypto.Hash
 }
 
-var hashLookup = map[crypto.Hash]string{
+// CryptoHashLookup maps crypto.hash to string name
+var CryptoHashLookup = map[crypto.Hash]string{
 	crypto.MD4:         "MD4",
 	crypto.SHA1:        "SHA1",
 	crypto.SHA224:      "SHA224",
@@ -45,102 +46,6 @@ var hashLookup = map[crypto.Hash]string{
 	crypto.BLAKE2b_256: "BLAKE2b_256",
 	crypto.BLAKE2b_384: "BLAKE2b_384",
 	crypto.BLAKE2b_512: "BLAKE2b_512",
-}
-
-// Sign with key
-func (kmss *KMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
-	// Check opts to see if the digest algo matches
-	if opts.HashFunc() != kmss.digest {
-		return nil, fmt.Errorf("Requested hash: %v, supported hash %v", hashLookup[opts.HashFunc()], hashLookup[kmss.digest])
-	}
-
-	// Build the request.
-	var digestPayload kmspb.Digest
-	switch kmss.digest {
-	case crypto.SHA256:
-		digestPayload = kmspb.Digest{
-			Digest: &kmspb.Digest_Sha256{
-				Sha256: digest,
-			},
-		}
-	case crypto.SHA384:
-		digestPayload = kmspb.Digest{
-			Digest: &kmspb.Digest_Sha384{
-				Sha384: digest,
-			},
-		}
-	case crypto.SHA512:
-		digestPayload = kmspb.Digest{
-			Digest: &kmspb.Digest_Sha512{
-				Sha512: digest,
-			},
-		}
-	}
-	req := &kmspb.AsymmetricSignRequest{
-		Name:   kmss.keyName,
-		Digest: &digestPayload,
-	}
-
-	// Query the API.
-	res, err := kmss.client.AsymmetricSign(kmss.ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf("%v\nrequested hash: %v", err, hashLookup[opts.HashFunc()])
-	}
-
-	return res.Signature, nil
-}
-
-// TODO: Move to own file as Sign does not match ssh.signer.Sign
-
-// SignWithSSHAlgorithm signs with algorithm
-func (kmss *KMSSigner) SignWithSSHAlgorithm(rand io.Reader, data []byte, algorithm string) (*ssh.Signature, error) {
-	var hashFunc crypto.Hash
-
-	if _, ok := kmss.publicKey.(*rsa.PublicKey); ok {
-		// RSA keys support a few hash functions determined by the requested signature algorithm
-		switch algorithm {
-		case "", ssh.SigAlgoRSA:
-			algorithm = ssh.SigAlgoRSA
-			hashFunc = crypto.SHA1
-		case ssh.SigAlgoRSASHA2256:
-			hashFunc = crypto.SHA256
-		case ssh.SigAlgoRSASHA2512:
-			hashFunc = crypto.SHA512
-		default:
-			return nil, fmt.Errorf("ssh: unsupported signature algorithm %s", algorithm)
-		}
-	} else {
-		return nil, fmt.Errorf("ssh: unsupported key type %T", kmss.publicKey)
-	}
-
-	var digest []byte
-	if hashFunc != 0 {
-		h := hashFunc.New()
-		h.Write(data)
-		digest = h.Sum(nil)
-	} else {
-		digest = data
-	}
-
-	signature, err := kmss.Sign(rand, digest, hashFunc)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ssh.Signature{
-		Format: algorithm,
-		Blob:   signature,
-	}, nil
-}
-
-// Public fetches public key
-func (kmss *KMSSigner) Public() crypto.PublicKey {
-	return kmss.publicKey
-}
-
-// PublicKey fetches public key in ssh format
-func (kmss *KMSSigner) PublicKey() ssh.PublicKey {
-	return kmss.sshPublicKey
 }
 
 // NewKMSSigner creates a new instance
@@ -203,4 +108,62 @@ func NewKMSSigner(keyName string) (signer crypto.Signer, err error) {
 	}
 
 	return &KMSSigner{keyName: keyName, ctx: ctx, client: client, publicKey: publicKey, digest: digestType, sshPublicKey: sshPublicKey}, nil
+}
+
+// Sign with key
+func (kmss *KMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+	// Check opts to see if the digest algo matches
+	if opts.HashFunc() != kmss.digest {
+		return nil, fmt.Errorf("Requested hash: %v, supported hash %v", CryptoHashLookup[opts.HashFunc()], CryptoHashLookup[kmss.digest])
+	}
+
+	// Build the request.
+	var digestPayload kmspb.Digest
+	switch kmss.digest {
+	case crypto.SHA256:
+		digestPayload = kmspb.Digest{
+			Digest: &kmspb.Digest_Sha256{
+				Sha256: digest,
+			},
+		}
+	case crypto.SHA384:
+		digestPayload = kmspb.Digest{
+			Digest: &kmspb.Digest_Sha384{
+				Sha384: digest,
+			},
+		}
+	case crypto.SHA512:
+		digestPayload = kmspb.Digest{
+			Digest: &kmspb.Digest_Sha512{
+				Sha512: digest,
+			},
+		}
+	}
+	req := &kmspb.AsymmetricSignRequest{
+		Name:   kmss.keyName,
+		Digest: &digestPayload,
+	}
+
+	// Query the API.
+	res, err := kmss.client.AsymmetricSign(kmss.ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("%v\nrequested hash: %v", err, CryptoHashLookup[opts.HashFunc()])
+	}
+
+	return res.Signature, nil
+}
+
+// Public fetches public key
+func (kmss *KMSSigner) Public() crypto.PublicKey {
+	return kmss.publicKey
+}
+
+// SSHPublicKey fetches public key in ssh format
+func (kmss *KMSSigner) SSHPublicKey() ssh.PublicKey {
+	return kmss.sshPublicKey
+}
+
+// Digest returns hash algo used for this key
+func (kmss *KMSSigner) Digest() crypto.Hash {
+	return kmss.digest
 }

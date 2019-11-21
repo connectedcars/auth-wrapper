@@ -12,17 +12,44 @@ steps:
   # Check version
   - name: 'gcr.io/cloud-builders/docker'
     args: ['version']
-  # Build auth wrapper image
+  #
+  # Build KMS auth wrappers
+  #
+  # Build auth wrapped git
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest', '.']
-  # Test cloud build wrapper using KSM key
-  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA'
+    args: [
+      'build',
+      '--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/git',
+      '--build-arg=WRAP_COMMAND=git',
+      '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA', 
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:latest', 
+      '.'
+      ]
+  # Build auth wrapped docker
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/docker',
+      '--build-arg=WRAP_COMMAND=docker',
+      '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:latest', 
+      '.'
+      ]
+  # Test auth wrapped docker using KSM key
+  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA'
     args: ['build', '--no-cache', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
     dir: 'testdata'
     env:
-      - "SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3"
       - "PROGRESS_NO_TRUNC=1"
       - "DOCKER_BUILDKIT=1"
+  # Test auth wrapped git using KSM key
+  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA'
+    args: ['clone', 'git@github.com:connectedcars/private-module.git']
+  #
+  # Build embedded key auth wrappers
+  #
   # Copy build key to workspace
   - name: 'gcr.io/cloud-builders/gsutil'
     args: [
@@ -30,12 +57,17 @@ steps:
             'gs://connectedcars-staging-cloudbuilder-private/build.pem',
             './localkey'
           ]
-  # Build auth wrapper image with embedded key
+  # Build auth wrapper docker image
   - name: 'gcr.io/cloud-builders/docker'
     dir: localkey
-    args: ['build', '--build-arg=FROM_IMAGE=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-pemkey.$BRANCH_NAME:$COMMIT_SHA', '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-pemkey.$BRANCH_NAME:latest', '.']
+    args: [
+      'build', 
+      '--build-arg=FROM_IMAGE=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME:$COMMIT_SHA', 
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME:latest', '.'
+      ]
   # Test cloud build wrapper using ssh key embedded in the container
-  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-pemkey.$BRANCH_NAME:$COMMIT_SHA'
+  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME:$COMMIT_SHA'
     args: ['build', '--no-cache', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
     dir: 'testdata'
     secretEnv:
@@ -48,6 +80,7 @@ secrets:
   secretEnv:
     SSH_KEY_PASSWORD: CiQAg7wCPfO2Tf9mtZoFWjAtX7whQ481af3gyGdM9WNK26B74UkSUQBefMgeHNh0KTsGybKReXDsFcbmed7f5sw97zSe9cswpKogENM5Ye0jiIu6NfebUpCnmJ9HVHmD/yBknlW4nn1VXBs7HYGiBSFZ52i2HyEopw==
 images: [
-  'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME',
-  'gcr.io/$PROJECT_ID/$REPO_NAME-pemkey.$BRANCH_NAME'
+  'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME',
+  'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME',
+  'gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME'
 ]

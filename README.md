@@ -19,7 +19,8 @@ Docker buildkit build with a key stored in Google Cloud KMS:
 export SSH_KEY_PATH=kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1
 export PROGRESS_NO_TRUNC=1
 export DOCKER_BUILDKIT=1
-auth-wrapper docker --progress=plain --ssh=default='$SSH_AUTH_SOCK' .
+# The strings $SSH_AUTH_SOCK and $$SSH_AUTH_SOCK will be replaced with socket in the arguments
+auth-wrapper docker --progress=plain --ssh=default='\$SSH_AUTH_SOCK' . # Note the escape to make sure we don't use the shells SSH_AUTH_SOCK
 ```
 
 [Dockerfile](./testdata/Dockerfile)
@@ -40,7 +41,7 @@ steps:
   - name: 'gcr.io/$PROJECT_ID/auth-wrapper.master:latest'
     args: ['build', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '-tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', '.']
     env:
-      - "SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3"
+      - "SSH_KEY_PATH=kms://projects/$PROJECT_ID/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/1"
       - "PROGRESS_NO_TRUNC=1"
       - "DOCKER_BUILDKIT=1"
 images: ['gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME']
@@ -53,6 +54,14 @@ export SSH_KEY_PATH=build.pem
 export SSH_KEY_PASSWORD=thepassword
 auth-wrapper git clone git@github.com:connectedcars/private-module.git
 ```
+
+## Options
+
+Environment variables:
+
+* SSH_KEY_PATH: Path to SSH key, can be OpenSSH PEM formated key or a url to KMS key
+* SSH_KEY_PASSWORD: Password to key, only used by PEM formated key
+* WRAP_COMMAND: Command to run with the arguments to auth-wrapper
 
 ## Google Cloud KMS key setup
 

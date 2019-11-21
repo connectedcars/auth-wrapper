@@ -8,7 +8,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/connectedcars/auth-wrapper/ssh"
+	"github.com/connectedcars/auth-wrapper/sshagent"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 func main() {
@@ -17,9 +18,21 @@ func main() {
 	os.Unsetenv("SSH_KEY_PATH")
 	os.Unsetenv("SSH_KEY_PASSWORD")
 
-	// Setup exec command
-	command := os.Args[1]
-	args := os.Args[2:]
+	var command string
+	var args []string
+	wrapCommand := os.Getenv("WRAP_COMMAND")
+	if wrapCommand != "" {
+		command = wrapCommand
+		args = os.Args[1:]
+	} else {
+		if len(os.Args) < 2 {
+			fmt.Fprintf(os.Stderr, "auth-wrapper cmd args")
+			os.Exit(1)
+		}
+		// Setup exec command
+		command = os.Args[1]
+		args = os.Args[2:]
+	}
 
 	exitCode, err := runWithSSHAgent(command, args, sshKeyPath, sshKeyPassword)
 	if err != nil {
@@ -29,28 +42,33 @@ func main() {
 }
 
 func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPassword string) (exitCode int, err error) {
+	var sshAgent agent.Agent
 	if sshKeyPath != "" {
-		var privateKey interface{}
 		if strings.HasPrefix(sshKeyPath, "kms://") {
 			var err error
 			kmsKeyPath := sshKeyPath[6:]
-			privateKey, err = ssh.NewKMSSigner(kmsKeyPath)
+			sshAgent, err = sshagent.NewKMSKeyring(kmsKeyPath)
 			if err != nil {
-				return 1, fmt.Errorf("Failed to setup KMSSigner %s: %v", kmsKeyPath, err)
+				return 1, fmt.Errorf("Failed to setup KMS Keyring %s: %v", kmsKeyPath, err)
 			}
 		} else {
+			var privateKey interface{}
 			privateKeyBytes, err := ioutil.ReadFile(sshKeyPath)
 			if err != nil {
 				return 1, fmt.Errorf("Failed to read SSHPrivateKey from %s: %v", sshKeyPath, err)
 			}
-			privateKey, err = ssh.ParsePrivateSSHKey(privateKeyBytes, sshKeyPassword)
+			privateKey, err = sshagent.ParsePrivateSSHKey(privateKeyBytes, sshKeyPassword)
 			if err != nil {
 				return 1, fmt.Errorf("Failed to read SSHPrivateKey from %s: %v", sshKeyPath, err)
 			}
+			sshAgent = agent.NewKeyring()
+			err = sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
+			if err != nil {
+				return 1, err
+			}
 		}
 
-		// TODO: Change interface so we give a Agent instead
-		sshAuthSock, err := ssh.SetupAgent(privateKey)
+		sshAuthSock, err := sshagent.StartSSHAgentServer(sshAgent)
 		if err != nil {
 			return 1, fmt.Errorf("Failed to start ssh agent server: %v", err)
 		}
@@ -59,7 +77,9 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 
 		// Do string replacement for SSH_AUTH_SOCK
 		for i, arg := range args {
+			fmt.Fprintf(os.Stderr, "arg[%d]: %s\n", i, arg)
 			args[i] = strings.ReplaceAll(arg, "$SSH_AUTH_SOCK", sshAuthSock)
+			args[i] = strings.ReplaceAll(args[i], "$$SSH_AUTH_SOCK", sshAuthSock)
 		}
 
 	}
@@ -68,10 +88,6 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-
-	if len(os.Args) < 2 {
-		return 1, fmt.Errorf("auth-wrapper cmd args")
-	}
 
 	if err := cmd.Start(); err != nil {
 		return 1, fmt.Errorf("cmd.Start: %v", err)
