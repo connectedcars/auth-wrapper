@@ -1,4 +1,13 @@
 steps:
+  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA'
+    args: ['build', '--no-cache', '--progress=plain', '--network=host', '.']
+    dir: 'token'
+    env:
+      - "PROGRESS_NO_TRUNC=1"
+      - "DOCKER_BUILDKIT=1"
+  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA'
+    args: ['build', '--no-cache', '--network=host', '.']
+    dir: 'token'
   # Pull a modern version of docker
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'gcr.io/cloud-builders/docker:latest']
