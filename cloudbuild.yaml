@@ -1,13 +1,4 @@
 steps:
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '--no-cache', '--progress=plain', '--network=host', '.']
-    dir: 'token'
-    env:
-      - "PROGRESS_NO_TRUNC=1"
-      - "DOCKER_BUILDKIT=1"
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '--no-cache', '--network=host', '.']
-    dir: 'token'
   # Pull a modern version of docker
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'gcr.io/cloud-builders/docker:latest']
@@ -21,6 +12,15 @@ steps:
   # Check version
   - name: 'gcr.io/cloud-builders/docker'
     args: ['version']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '--no-cache', '--progress=plain', '--network=host', '.']
+    dir: 'token'
+    env:
+      - "PROGRESS_NO_TRUNC=1"
+      - "DOCKER_BUILDKIT=1"
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '--no-cache', '--network=host', '.']
+    dir: 'token'
   #
   # Build KMS auth wrappers
   #
