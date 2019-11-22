@@ -19,7 +19,7 @@ steps:
       - "PROGRESS_NO_TRUNC=1"
       - "DOCKER_BUILDKIT=1"
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '--no-cache', '--network=host', '.']
+    args: ['build', '--no-cache', '--network=cloudbuild', '.']
     dir: 'token'
   #
   # Build KMS auth wrappers
