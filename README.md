@@ -37,8 +37,8 @@ steps:
     args: ['pull', 'docker/dockerfile:experimental']
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'docker/dockerfile:1.0-experimental']
-  # Build container injecting 
-  - name: 'gcr.io/$PROJECT_ID/auth-wrapper.master:latest'
+  # Build container injecting SSH agent socket
+  - name: 'gcr.io/$PROJECT_ID/auth-wrapper-docker.master:latest'
     args: ['build', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '-tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', '.']
     env:
       - "SSH_KEY_PATH=kms://projects/$PROJECT_ID/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/1"
