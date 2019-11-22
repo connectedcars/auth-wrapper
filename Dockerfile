@@ -13,8 +13,8 @@ WORKDIR /app
 
 RUN go version
 
-# Needs access to a google token
-#RUN go test ./...
+# Needs access to a google token and a ssh client
+# RUN go test ./...
 
 ENV GO111MODULE=on
 
@@ -32,6 +32,9 @@ RUN ln -s /opt/bin/auth-wrapper /opt/bin/${WRAP_NAME}
 
 # Used by git image
 ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
+# Force google tools to use the DNS name so we can overwrite it in docker
+ENV GCE_METADATA_HOST=metadata.google.internal
 
 ENV PATH=/opt/bin:${PATH}
 ENV WRAP_COMMAND=${WRAP_COMMAND}
