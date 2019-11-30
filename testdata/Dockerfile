@@ -1,8 +1,10 @@
 # syntax = docker/dockerfile:experimental
 FROM ubuntu:19.10 as builder
 
-# Force google tools to use the DNS name so we can overwrite it in docker
+# Force go tools to use the DNS name so we can overwrite it in docker
 ENV GCE_METADATA_HOST=metadata.google.internal
+# Used by google python code
+#ENV GCE_METADATA_ROOT=metadata.google.internal
 
 # Test ssh key injection
 RUN apt-get update -qq && \

@@ -53,7 +53,7 @@ func StartMetadateServer(proxyURL string) {
 				if err != nil {
 					log.Fatal(err)
 				}
-				projectNumber, err := gcloudGetValue("projects", "describe", projectID, "--format", "value(parent.id)")
+				projectNumber, err := gcloudGetValue("projects", "describe", projectID, "--format", "value(projectNumber)")
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -95,6 +95,6 @@ func gcloudGetValue(args ...string) (value string, err error) {
 	if err != nil {
 		return "", err
 	}
-	value = strings.TrimRight(string(out), "\r\n")
+	value = strings.TrimSpace(strings.TrimRight(string(out), "\r\n"))
 	return value, nil
 }
