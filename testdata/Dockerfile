@@ -9,9 +9,8 @@ ENV GCE_METADATA_HOST=metadata.google.internal
 # Test ssh key injection
 RUN apt-get update -qq && \
 	apt-get dist-upgrade -qq -y --no-install-recommends && \
-	apt-get install -qq -y --no-install-recommends git openssh-client \
-	# curl ca-certificates \
-	# python python3 && \
+	apt-get install -qq -y --no-install-recommends git openssh-client && \
+	# curl ca-certificates python python3 && \
 	rm -rf /var/lib/apt/lists/*
 
 # Install gcloud sdk
