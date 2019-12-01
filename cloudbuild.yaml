@@ -8,6 +8,8 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'docker/dockerfile:1.0-experimental']
   - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker.io/docker/dockerfile-copy:v0.1.9']
+  - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'ubuntu:19.10']
   # Check version
   - name: 'gcr.io/cloud-builders/docker'
@@ -42,7 +44,15 @@ steps:
       ]
   # Test auth wrapped docker using KSM key
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA'
-    args: ['build', '--no-cache', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
+    args: [
+      'build',
+      '--no-cache',
+      '--progress=plain',
+      '--ssh=default=$$SSH_AUTH_SOCK',
+      #'--network=host',
+      #'--add-host=metadata.google.internal:127.0.0.1',
+      '.'
+      ]
     dir: 'testdata'
     env:
       - "PROGRESS_NO_TRUNC=1"
@@ -71,7 +81,15 @@ steps:
       ]
   # Test cloud build wrapper using ssh key embedded in the container
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME:$COMMIT_SHA'
-    args: ['build', '--no-cache', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '.']
+    args: [
+      'build',
+      '--no-cache',
+      '--progress=plain',
+      '--ssh=default=$$SSH_AUTH_SOCK',
+      #'--network=host',
+      #'--add-host=metadata.google.internal:127.0.0.1',
+      '.'
+      ]
     dir: 'testdata'
     secretEnv:
       - 'SSH_KEY_PASSWORD'

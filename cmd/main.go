@@ -9,18 +9,14 @@ import (
 	"strings"
 	"syscall"
 
+	"cloud.google.com/go/compute/metadata"
+	"github.com/connectedcars/auth-wrapper/gcemetadata"
 	"github.com/connectedcars/auth-wrapper/sshagent"
 	"golang.org/x/crypto/ssh/agent"
 )
 
 func main() {
-	sshKeyPath := os.Getenv("SSH_KEY_PATH")
-	sshKeyPassword := os.Getenv("SSH_KEY_PASSWORD")
-	os.Unsetenv("SSH_KEY_PATH")
-	os.Unsetenv("SSH_KEY_PASSWORD")
-
 	processName := filepath.Base(os.Args[0])
-
 	var command string
 	var args []string
 	wrapCommand := os.Getenv("WRAP_COMMAND")
@@ -53,10 +49,27 @@ func main() {
 		args = os.Args[2:]
 	}
 
+	gceMetaDataURL := os.Getenv("GCE_METADATA_URL")
+	if gceMetaDataURL == "auto" {
+		if metadata.OnGCE() {
+			gcemetadata.StartMetadateServer("http://169.254.169.254")
+		}
+	} else if gceMetaDataURL == "emulate" {
+		// Start emulation server
+		gcemetadata.StartMetadateServer("")
+	} else if gceMetaDataURL != "" {
+		gcemetadata.StartMetadateServer(gceMetaDataURL)
+	}
+
+	sshKeyPath := os.Getenv("SSH_KEY_PATH")
+	sshKeyPassword := os.Getenv("SSH_KEY_PASSWORD")
+	os.Unsetenv("SSH_KEY_PATH")
+	os.Unsetenv("SSH_KEY_PASSWORD")
 	exitCode, err := runWithSSHAgent(command, args, sshKeyPath, sshKeyPassword)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 	}
+	fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
 	os.Exit(exitCode)
 }
 
@@ -96,7 +109,7 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 
 		// Do string replacement for SSH_AUTH_SOCK
 		for i, arg := range args {
-			fmt.Fprintf(os.Stderr, "arg[%d]: %s\n", i, arg)
+			//fmt.Fprintf(os.Stderr, "arg[%d]: %s\n", i, arg)
 			args[i] = strings.ReplaceAll(arg, "$SSH_AUTH_SOCK", sshAuthSock)
 			args[i] = strings.ReplaceAll(args[i], "$$SSH_AUTH_SOCK", sshAuthSock)
 		}
