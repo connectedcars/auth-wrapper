@@ -50,13 +50,15 @@ func main() {
 	}
 
 	gceMetaDataURL := os.Getenv("GCE_METADATA_URL")
-	if gceMetaDataURL != "" {
-		gcemetadata.StartMetadateServer(gceMetaDataURL)
-	} else if metadata.OnGCE() {
-		gcemetadata.StartMetadateServer("http://169.254.169.254")
-	} else {
+	if gceMetaDataURL == "auto" {
+		if metadata.OnGCE() {
+			gcemetadata.StartMetadateServer("http://169.254.169.254")
+		}
+	} else if gceMetaDataURL == "emulate" {
 		// Start emulation server
 		gcemetadata.StartMetadateServer("")
+	} else if gceMetaDataURL != "" {
+		gcemetadata.StartMetadateServer(gceMetaDataURL)
 	}
 
 	sshKeyPath := os.Getenv("SSH_KEY_PATH")
@@ -67,8 +69,8 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 	}
-	fmt.Fprintf(os.Stderr, "%v\n", exitCode)
-	//os.Exit(exitCode)
+	fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
+	os.Exit(exitCode)
 }
 
 func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPassword string) (exitCode int, err error) {

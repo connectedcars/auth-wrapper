@@ -10,16 +10,16 @@ ENV GCE_METADATA_HOST=metadata.google.internal
 RUN apt-get update -qq && \
 	apt-get dist-upgrade -qq -y --no-install-recommends && \
 	apt-get install -qq -y --no-install-recommends git openssh-client \
-	curl ca-certificates python python3 && \
+	# curl ca-certificates \
+	# python python3 && \
 	rm -rf /var/lib/apt/lists/*
 
 # Install gcloud sdk
-RUN curl -sSL https://sdk.cloud.google.com | bash
-ENV PATH $PATH:/root/google-cloud-sdk/bin
-
-#RUN curl -s -v -H "Accept-Encoding: identity" -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/numeric-project-id && echo 
-#RUN gcloud auth print-access-token
-#RUN gsutil -DD ls gs://connectedcars-staging-cloudbuilder-private/
+# RUN curl -sSL https://sdk.cloud.google.com | bash
+# ENV PATH $PATH:/root/google-cloud-sdk/bin
+# RUN curl -s -v -H "Accept-Encoding: identity" -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/numeric-project-id
+# RUN gcloud auth print-access-token
+# RUN gsutil -DD ls gs://connectedcars-staging-cloudbuilder-private/
 
 RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 
