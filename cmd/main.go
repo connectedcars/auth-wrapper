@@ -12,6 +12,7 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	"github.com/connectedcars/auth-wrapper/gcemetadata"
 	"github.com/connectedcars/auth-wrapper/sshagent"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
 
@@ -98,6 +99,17 @@ func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPas
 			if err != nil {
 				return 1, err
 			}
+		}
+
+		// Print loaded keys
+		keyList, err := sshAgent.List()
+		if err != nil {
+			return 1, fmt.Errorf("Failed to list sshAgent keys %s: %v", sshKeyPath, err)
+		}
+
+		fmt.Fprintf(os.Stderr, "Loaded keys:\n")
+		for _, key := range keyList {
+			fmt.Fprintf(os.Stderr, "%s\n", string(ssh.MarshalAuthorizedKey(key)))
 		}
 
 		sshAuthSock, err := sshagent.StartSSHAgentServer(sshAgent)
