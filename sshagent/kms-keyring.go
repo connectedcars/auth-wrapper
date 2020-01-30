@@ -16,7 +16,7 @@ import (
 )
 
 type kmsKeyring struct {
-	signer *KMSSigner
+	signer KMSSigner
 
 	locked     bool
 	passphrase []byte
@@ -27,11 +27,11 @@ var errLocked = errors.New("agent: locked")
 // NewKMSKeyring returns an Agent that holds keys in memory.  It is safe
 // for concurrent use by multiple goroutines.
 func NewKMSKeyring(kmsKeyPath string) (sshAgent agent.ExtendedAgent, err error) {
-	privateKey, err := NewKMSSigner(kmsKeyPath)
+	privateKey, err := NewKMSSigner(kmsKeyPath, false)
 	if err != nil {
 		return nil, err
 	}
-	return &kmsKeyring{signer: privateKey.(*KMSSigner)}, nil
+	return &kmsKeyring{signer: privateKey}, nil
 }
 
 func (r *kmsKeyring) RemoveAll() error {

@@ -16,14 +16,23 @@ import (
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 )
 
-// KMSSigner is a key
-type KMSSigner struct {
+// KMSSigner is an interface for an opaque private key that can be used for
+// signing operations. For example, an RSA key kept in a hardware module.
+type KMSSigner interface {
+	crypto.Signer
+	Digest() crypto.Hash
+	SSHPublicKey() ssh.PublicKey
+}
+
+// kmsSigner is a key
+type kmsSigner struct {
 	ctx          context.Context
 	client       *cloudkms.KeyManagementClient
 	keyName      string
 	publicKey    crypto.PublicKey
 	sshPublicKey ssh.PublicKey
 	digest       crypto.Hash
+	forceDigest  bool
 }
 
 // CryptoHashLookup maps crypto.hash to string name
@@ -49,7 +58,7 @@ var CryptoHashLookup = map[crypto.Hash]string{
 }
 
 // NewKMSSigner creates a new instance
-func NewKMSSigner(keyName string) (signer crypto.Signer, err error) {
+func NewKMSSigner(keyName string, forceDigest bool) (signer KMSSigner, err error) {
 	// Create the KMS client.
 	ctx := context.Background()
 	client, err := cloudkms.NewKeyManagementClient(ctx)
@@ -107,13 +116,20 @@ func NewKMSSigner(keyName string) (signer crypto.Signer, err error) {
 		return nil, fmt.Errorf("key %q is not supported format", keyName)
 	}
 
-	return &KMSSigner{keyName: keyName, ctx: ctx, client: client, publicKey: publicKey, digest: digestType, sshPublicKey: sshPublicKey}, nil
+	return &kmsSigner{keyName: keyName,
+		ctx:          ctx,
+		client:       client,
+		publicKey:    publicKey,
+		digest:       digestType,
+		sshPublicKey: sshPublicKey,
+		forceDigest:  forceDigest,
+	}, nil
 }
 
 // Sign with key
-func (kmss *KMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+func (kmss *kmsSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
 	// Check opts to see if the digest algo matches
-	if opts.HashFunc() != kmss.digest {
+	if !kmss.forceDigest && opts.HashFunc() != kmss.digest {
 		return nil, fmt.Errorf("Requested hash: %v, supported hash %v", CryptoHashLookup[opts.HashFunc()], CryptoHashLookup[kmss.digest])
 	}
 
@@ -154,16 +170,16 @@ func (kmss *KMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpt
 }
 
 // Public fetches public key
-func (kmss *KMSSigner) Public() crypto.PublicKey {
+func (kmss *kmsSigner) Public() crypto.PublicKey {
 	return kmss.publicKey
 }
 
 // SSHPublicKey fetches public key in ssh format
-func (kmss *KMSSigner) SSHPublicKey() ssh.PublicKey {
+func (kmss *kmsSigner) SSHPublicKey() ssh.PublicKey {
 	return kmss.sshPublicKey
 }
 
 // Digest returns hash algo used for this key
-func (kmss *KMSSigner) Digest() crypto.Hash {
+func (kmss *kmsSigner) Digest() crypto.Hash {
 	return kmss.digest
 }
