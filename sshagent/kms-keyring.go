@@ -2,12 +2,7 @@ package sshagent
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/dsa"
-	"crypto/ecdsa"
-	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/rsa"
 	"errors"
 	"fmt"
 
@@ -16,7 +11,12 @@ import (
 )
 
 type kmsKeyring struct {
-	signer KMSSigner
+	userPrivateKeyPath string
+	caPrivateKeyPath   string
+	userSigner         KMSSigner
+	userSSHSigner      ssh.Signer
+	caSigner           KMSSigner
+	caSSHSigner        ssh.Signer
 
 	locked     bool
 	passphrase []byte
@@ -26,12 +26,33 @@ var errLocked = errors.New("agent: locked")
 
 // NewKMSKeyring returns an Agent that holds keys in memory.  It is safe
 // for concurrent use by multiple goroutines.
-func NewKMSKeyring(kmsKeyPath string) (sshAgent agent.ExtendedAgent, err error) {
-	privateKey, err := NewKMSSigner(kmsKeyPath, false)
+func NewKMSKeyring(userPrivateKeyPath string, caPrivateKeyPath string) (sshAgent agent.ExtendedAgent, err error) {
+	userPrivateKey, err := NewKMSSigner(userPrivateKeyPath, false)
 	if err != nil {
 		return nil, err
 	}
-	return &kmsKeyring{signer: privateKey}, nil
+	userSSHSigner, err := NewSSHSignerFromKMSSigner(userPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed NewSignerFromSigner from: %v", err)
+	}
+
+	caPrivateKey, err := NewKMSSigner(caPrivateKeyPath, false)
+	if err != nil {
+		return nil, err
+	}
+	caSSHSigner, err := NewSSHSignerFromKMSSigner(caPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed NewSignerFromSigner from: %v", err)
+	}
+
+	return &kmsKeyring{
+		userPrivateKeyPath: userPrivateKeyPath,
+		caPrivateKeyPath:   caPrivateKeyPath,
+		userSigner:         userPrivateKey,
+		caSigner:           caPrivateKey,
+		userSSHSigner:      userSSHSigner,
+		caSSHSigner:        caSSHSigner,
+	}, nil
 }
 
 func (r *kmsKeyring) RemoveAll() error {
@@ -64,15 +85,58 @@ func (r *kmsKeyring) Extension(extensionType string, contents []byte) ([]byte, e
 	return nil, agent.ErrExtensionUnsupported
 }
 
+// SSHCertificate adds support for modern hash type
+type SSHCertificate struct {
+	ssh.Certificate
+}
+
+// Type returns the key name. It is part of the PublicKey interface.
+func (c *SSHCertificate) Type() string {
+	return "rsa-sha2-512-cert-v01@openssh.com"
+}
+
 // List returns the identities known to the agent.
 func (r *kmsKeyring) List() ([]*agent.Key, error) {
 	var ids []*agent.Key
 
-	pub := r.signer.SSHPublicKey()
+	userPublicKey := r.userSigner.SSHPublicKey()
 	ids = append(ids, &agent.Key{
-		Format:  pub.Type(),
-		Blob:    pub.Marshal(),
-		Comment: "my kms key"})
+		Format:  userPublicKey.Type(),
+		Blob:    userPublicKey.Marshal(),
+		Comment: "user " + r.userPrivateKeyPath})
+
+	// Add the CA public key so it's easy to copy paste
+	caPublicKey := r.caSigner.SSHPublicKey()
+	ids = append(ids, &agent.Key{
+		Format:  caPublicKey.Type(),
+		Blob:    caPublicKey.Marshal(),
+		Comment: "ca " + r.caPrivateKeyPath})
+
+	// Sign and add a user certificate to the keyring
+	userCert := &SSHCertificate{ssh.Certificate{
+		Key:             userPublicKey,
+		KeyId:           "test",
+		CertType:        ssh.UserCert,
+		ValidPrincipals: []string{"tlb"},
+		ValidAfter:      0,
+		ValidBefore:     ssh.CertTimeInfinity, // uint64(time.Now().Add(time.Minute * 60).Unix()),
+		Permissions: ssh.Permissions{
+			CriticalOptions: map[string]string{},
+			Extensions:      map[string]string{},
+		},
+	}}
+	err := userCert.SignCert(rand.Reader, r.caSSHSigner)
+	if err != nil {
+		return nil, fmt.Errorf("failed SignCert from %v", err)
+	}
+
+	// TODO: the go lang ssh cert implementation does not support forcing rsa-sha2-256-cert-v01@openssh.com or rsa-sha2-512-cert-v01@openssh.com
+	// To fix this we would need to replace the keyname in the certBlob with one of the names listed.
+	certBlob := userCert.Marshal()
+	ids = append(ids, &agent.Key{
+		Format:  userCert.Type(),
+		Blob:    certBlob,
+		Comment: "user cert " + r.userPrivateKeyPath})
 
 	return ids, nil
 }
@@ -85,55 +149,13 @@ func (r *kmsKeyring) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error
 func (r *kmsKeyring) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.SignatureFlags) (*ssh.Signature, error) {
 	wanted := key.Marshal()
 
-	if bytes.Equal(r.signer.SSHPublicKey().Marshal(), wanted) {
+	if bytes.Equal(r.userSigner.SSHPublicKey().Marshal(), wanted) {
 		// Ignore flags as they google key only supports one type of hashing.
-
-		// Generate digest
-		var digest []byte
-		h := r.signer.Digest().New()
-		h.Write(data)
-		digest = h.Sum(nil)
-
-		// Sign the digest
-		signature, err := r.signer.Sign(rand.Reader, digest, r.signer.Digest())
+		signature, err := r.userSSHSigner.Sign(rand.Reader, data)
 		if err != nil {
 			return nil, err
 		}
-
-		var algorithm string
-		switch r.signer.Public().(type) {
-		case *dsa.PublicKey:
-			algorithm = ssh.KeyAlgoDSA // Not support by KMS
-		case *rsa.PublicKey:
-			switch r.signer.Digest() {
-			case crypto.SHA1: // Not support by KMS
-				algorithm = ssh.SigAlgoRSA
-			case crypto.SHA256:
-				algorithm = ssh.SigAlgoRSASHA2256
-			case crypto.SHA512:
-				algorithm = ssh.SigAlgoRSASHA2512
-			default:
-				return nil, fmt.Errorf("Unknown digest type %v", CryptoHashLookup[r.signer.Digest()])
-			}
-		case *ecdsa.PublicKey:
-			switch r.signer.Digest() {
-			case crypto.SHA256:
-				algorithm = ssh.KeyAlgoECDSA256
-			case crypto.SHA384:
-				algorithm = ssh.KeyAlgoECDSA384
-			case crypto.SHA512:
-				algorithm = ssh.KeyAlgoECDSA521
-			default:
-				return nil, fmt.Errorf("Unknown digest type %v", CryptoHashLookup[r.signer.Digest()])
-			}
-		case *ed25519.PublicKey:
-			algorithm = ssh.KeyAlgoED25519
-		}
-
-		return &ssh.Signature{
-			Format: algorithm,
-			Blob:   signature,
-		}, nil
+		return signature, nil
 	}
 
 	return nil, errors.New("not found")

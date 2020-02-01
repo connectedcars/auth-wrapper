@@ -116,7 +116,8 @@ func NewKMSSigner(keyName string, forceDigest bool) (signer KMSSigner, err error
 		return nil, fmt.Errorf("key %q is not supported format", keyName)
 	}
 
-	return &kmsSigner{keyName: keyName,
+	return &kmsSigner{
+		keyName:      keyName,
 		ctx:          ctx,
 		client:       client,
 		publicKey:    publicKey,

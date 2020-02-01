@@ -66,68 +66,104 @@ func main() {
 	sshKeyPassword := os.Getenv("SSH_KEY_PASSWORD")
 	os.Unsetenv("SSH_KEY_PATH")
 	os.Unsetenv("SSH_KEY_PASSWORD")
-	exitCode, err := runWithSSHAgent(command, args, sshKeyPath, sshKeyPassword)
+
+	sshCaKeyPath := os.Getenv("SSH_CA_KEY_PATH")
+	sshCaKeyPassword := os.Getenv("SSH_CA_KEY_PASSWORD")
+	os.Unsetenv("SSH_CA_KEY_PATH")
+	os.Unsetenv("SSH_CA_KEY_PASSWORD")
+
+	// Run command with SSH Agent
+	var exitCode int
+	var err error
+	if sshKeyPath != "" {
+		exitCode, err = runCommandWithSSHAgent(&SSHAgentConfig{
+			userPrivateKeyPath:     sshKeyPath,
+			userPrivateKeyPassword: sshKeyPassword,
+			caPrivateKeyPath:       sshCaKeyPath,
+			caPrivateKeyPassword:   sshCaKeyPassword,
+		}, command, args)
+
+	} else {
+		exitCode, err = runCommand(command, args)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 	}
+
 	fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
 	os.Exit(exitCode)
 }
 
-func runWithSSHAgent(command string, args []string, sshKeyPath string, sshKeyPassword string) (exitCode int, err error) {
-	var sshAgent agent.Agent
-	if sshKeyPath != "" {
-		if strings.HasPrefix(sshKeyPath, "kms://") {
-			var err error
-			kmsKeyPath := sshKeyPath[6:]
-			sshAgent, err = sshagent.NewKMSKeyring(kmsKeyPath)
-			if err != nil {
-				return 1, fmt.Errorf("Failed to setup KMS Keyring %s: %v", kmsKeyPath, err)
-			}
-		} else {
-			var privateKey interface{}
-			privateKeyBytes, err := ioutil.ReadFile(sshKeyPath)
-			if err != nil {
-				return 1, fmt.Errorf("Failed to read SSHPrivateKey from %s: %v", sshKeyPath, err)
-			}
-			privateKey, err = sshagent.ParsePrivateSSHKey(privateKeyBytes, sshKeyPassword)
-			if err != nil {
-				return 1, fmt.Errorf("Failed to read SSHPrivateKey from %s: %v", sshKeyPath, err)
-			}
-			sshAgent = agent.NewKeyring()
-			err = sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
-			if err != nil {
-				return 1, err
-			}
-		}
+// SSHAgentConfig holds the config for the SSH Agent
+type SSHAgentConfig struct {
+	userPrivateKeyPath     string
+	userPrivateKeyPassword string
+	caPrivateKeyPath       string
+	caPrivateKeyPassword   string
+}
 
-		// Print loaded keys
-		keyList, err := sshAgent.List()
-		if err != nil {
-			return 1, fmt.Errorf("Failed to list sshAgent keys %s: %v", sshKeyPath, err)
-		}
-
-		fmt.Fprintf(os.Stderr, "Loaded keys:\n")
-		for _, key := range keyList {
-			fmt.Fprintf(os.Stderr, "%s\n", string(ssh.MarshalAuthorizedKey(key)))
-		}
-
-		sshAuthSock, err := sshagent.StartSSHAgentServer(sshAgent)
-		if err != nil {
-			return 1, fmt.Errorf("Failed to start ssh agent server: %v", err)
-		}
-		fmt.Fprintf(os.Stderr, "Setting SSH_AUTH_SOCK using ssh key: %s\n", sshKeyPath)
-		os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
-
-		// Do string replacement for SSH_AUTH_SOCK
-		for i, arg := range args {
-			//fmt.Fprintf(os.Stderr, "arg[%d]: %s\n", i, arg)
-			args[i] = strings.ReplaceAll(arg, "$SSH_AUTH_SOCK", sshAuthSock)
-			args[i] = strings.ReplaceAll(args[i], "$$SSH_AUTH_SOCK", sshAuthSock)
-		}
-
+func runCommandWithSSHAgent(config *SSHAgentConfig, command string, args []string) (exitCode int, err error) {
+	agent, err := createSSHAgent(config)
+	if err != nil {
+		return 255, fmt.Errorf("Failed to setup ssh agent: %v\n", err)
 	}
 
+	sshAuthSock, err := sshagent.StartSSHAgentServer(agent)
+	if err != nil {
+		return 255, fmt.Errorf("Failed to start ssh agent server: %v", err)
+	}
+	fmt.Fprintf(os.Stderr, "Setting SSH_AUTH_SOCK using ssh key: %s\n", config.userPrivateKeyPath)
+	os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
+
+	// Do string replacement for SSH_AUTH_SOCK
+	for i, arg := range args {
+		args[i] = strings.ReplaceAll(arg, "$SSH_AUTH_SOCK", sshAuthSock)
+		args[i] = strings.ReplaceAll(args[i], "$$SSH_AUTH_SOCK", sshAuthSock)
+	}
+
+	// Print loaded keys
+	keyList, err := agent.List()
+	if err != nil {
+		return 255, fmt.Errorf("Failed to list sshAgent keys %s: %v", config.userPrivateKeyPath, err)
+	}
+	fmt.Fprintf(os.Stderr, "Loaded keys:\n")
+	for _, key := range keyList {
+		fmt.Fprintf(os.Stderr, "%s %s\n", strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(key)), "\n"), key.Comment)
+	}
+
+	return runCommand(command, args)
+}
+
+func createSSHAgent(config *SSHAgentConfig) (sshAgent agent.Agent, err error) {
+	// TODO: Support mixing keys
+	if strings.HasPrefix(config.userPrivateKeyPath, "kms://") && strings.HasPrefix(config.caPrivateKeyPath, "kms://") {
+		var err error
+		userPrivateKeyPath := config.userPrivateKeyPath[6:]
+		caPrivateKeyPath := config.caPrivateKeyPath[6:]
+		sshAgent, err = sshagent.NewKMSKeyring(userPrivateKeyPath, caPrivateKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to setup KMS Keyring %s: %v", userPrivateKeyPath, err)
+		}
+	} else {
+		var privateKey interface{}
+		privateKeyBytes, err := ioutil.ReadFile(config.userPrivateKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to read user SSH private key from %s: %v", config.userPrivateKeyPath, err)
+		}
+		privateKey, err = sshagent.ParsePrivateSSHKey(privateKeyBytes, config.userPrivateKeyPassword)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to read or decrypt SSH private key from %s: %v", config.userPrivateKeyPath, err)
+		}
+		sshAgent = agent.NewKeyring()
+		err = sshAgent.Add(agent.AddedKey{PrivateKey: privateKey, Comment: "my private key"})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return sshAgent, nil
+}
+
+func runCommand(command string, args []string) (exitCode int, err error) {
 	cmd := exec.Command(command, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
