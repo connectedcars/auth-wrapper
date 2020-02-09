@@ -1,11 +1,14 @@
 package sshagent
 
+// TODO: Make generic so it can be used with other key implementation
+
 import (
 	"bytes"
 	"crypto/rand"
 	"errors"
 	"fmt"
 
+	"github.com/connectedcars/auth-wrapper/server"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
@@ -85,16 +88,6 @@ func (r *kmsKeyring) Extension(extensionType string, contents []byte) ([]byte, e
 	return nil, agent.ErrExtensionUnsupported
 }
 
-// SSHCertificate adds support for modern hash type
-type SSHCertificate struct {
-	ssh.Certificate
-}
-
-// Type returns the key name. It is part of the PublicKey interface.
-func (c *SSHCertificate) Type() string {
-	return "rsa-sha2-512-cert-v01@openssh.com"
-}
-
 // List returns the identities known to the agent.
 func (r *kmsKeyring) List() ([]*agent.Key, error) {
 	var ids []*agent.Key
@@ -112,25 +105,38 @@ func (r *kmsKeyring) List() ([]*agent.Key, error) {
 		Blob:    caPublicKey.Marshal(),
 		Comment: "ca " + r.caPrivateKeyPath})
 
-	// Sign and add a user certificate to the keyring
-	userCert := &SSHCertificate{ssh.Certificate{
-		Key:             userPublicKey,
-		KeyId:           "test",
-		CertType:        ssh.UserCert,
-		ValidPrincipals: []string{"tlb"},
-		ValidAfter:      0,
-		ValidBefore:     ssh.CertTimeInfinity, // uint64(time.Now().Add(time.Minute * 60).Unix()),
-		Permissions: ssh.Permissions{
-			CriticalOptions: map[string]string{},
-			Extensions:      map[string]string{},
-		},
-	}}
-	err := userCert.SignCert(rand.Reader, r.caSSHSigner)
+	signingServer := server.NewSigningServer(r.caSSHSigner)
+
+	// TODO: Make HTTP request to get a signed certificate
+	// 1. GET /certificate/challenge # { value: "{ \"timestamp\": \"2020-01-01T10:00:00.000Z\" \"random\": \"...\"}", signature: "signed by CA key" }
+	challenge, err := signingServer.GenerateChallenge()
 	if err != nil {
-		return nil, fmt.Errorf("failed SignCert from %v", err)
+		// TODO: Error handling, fx. hard fail
+	}
+
+	// 2. POST /certificate # { challenge: "\...value", command: "", args: "", pubkey: "..." signature: "signed by user key" }
+	certRequest := &server.CertificateRequest{
+		Challenge: challenge,
+		Command:   "some command", // TODO: Get command
+		Args:      []string{},     // TODO: Get args
+		PublicKey: string(ssh.MarshalAuthorizedKey(userPublicKey)),
+	}
+	certRequest.SignRequest(rand.Reader, r.userSSHSigner)
+
+	// # Client: sign(challenge + command + args) Server: pubkey.verify(challenge + command + args, signature)
+	err = signingServer.VerifyCertificateRequest(certRequest)
+	if err != nil {
+		// TODO: Error handling
+	}
+
+	// Get back { certificate: "base64 encoded cert" }
+	userCert, err := signingServer.IssueUserCertificate(r.userSigner.SSHPublicKey())
+	if err != nil {
+		// TODO: Error handling
 	}
 
 	// TODO: the go lang ssh cert implementation does not support forcing rsa-sha2-256-cert-v01@openssh.com or rsa-sha2-512-cert-v01@openssh.com
+	// https://cvsweb.openbsd.org/src/usr.bin/ssh/PROTOCOL.certkeys?annotate=HEAD
 	// To fix this we would need to replace the keyname in the certBlob with one of the names listed.
 	certBlob := userCert.Marshal()
 	ids = append(ids, &agent.Key{

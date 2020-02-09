@@ -16,6 +16,10 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
+// authwrapper ssh 1.2.3.4
+// Please write reason for login:
+//
+
 func main() {
 	processName := filepath.Base(os.Args[0])
 	var command string
