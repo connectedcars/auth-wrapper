@@ -19,8 +19,8 @@ type Challenge struct {
 }
 
 type challengeValue struct {
-	timestamp time.Time
-	random    []byte
+	Timestamp string `json:"timestamp"`
+	Random    []byte `json:"random"`
 }
 
 // CertificateRequest for SSH user certificate
@@ -69,7 +69,7 @@ func (s *SigningServer) VerifyCertificateRequest(certRequest *CertificateRequest
 
 	// Unpack the value and ensure it's still valid
 	var value challengeValue
-	err = json.Unmarshal(challenge.Value, value)
+	err = json.Unmarshal(challenge.Value, &value)
 	if err != nil {
 		return err
 	}
@@ -135,10 +135,11 @@ func (s *SigningServer) GenerateChallenge() (challenge *Challenge, err error) {
 		return nil, err
 	}
 
-	jsonBytes, err := json.Marshal(challengeValue{
-		timestamp: time.Now(),
-		random:    randomBytes,
+	jsonBytes, err := json.Marshal(&challengeValue{
+		Timestamp: time.Now().UTC().Format("2006-01-02T15:04:05.999Z"),
+		Random:    randomBytes,
 	})
+
 	if err != nil {
 		return nil, err
 	}
