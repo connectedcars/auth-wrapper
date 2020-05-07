@@ -5,8 +5,13 @@ package sshagent
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"time"
 
 	"github.com/connectedcars/auth-wrapper/server"
 	"golang.org/x/crypto/ssh"
@@ -20,6 +25,8 @@ type kmsKeyring struct {
 	userSSHSigner      ssh.Signer
 	caSigner           KMSSigner
 	caSSHSigner        ssh.Signer
+	signingServerURL   string
+	signingHTTPClient  *http.Client
 
 	locked     bool
 	passphrase []byte
@@ -29,7 +36,7 @@ var errLocked = errors.New("agent: locked")
 
 // NewKMSKeyring returns an Agent that holds keys in memory.  It is safe
 // for concurrent use by multiple goroutines.
-func NewKMSKeyring(userPrivateKeyPath string, caPrivateKeyPath string) (sshAgent agent.ExtendedAgent, err error) {
+func NewKMSKeyring(userPrivateKeyPath string, caPrivateKeyPath string, signingServerURL string) (sshAgent agent.ExtendedAgent, err error) {
 	userPrivateKey, err := NewKMSSigner(userPrivateKeyPath, false)
 	if err != nil {
 		return nil, err
@@ -48,6 +55,8 @@ func NewKMSKeyring(userPrivateKeyPath string, caPrivateKeyPath string) (sshAgent
 		return nil, fmt.Errorf("failed NewSignerFromSigner from: %v", err)
 	}
 
+	signingHTTPClient := &http.Client{Timeout: 10 * time.Second}
+
 	return &kmsKeyring{
 		userPrivateKeyPath: userPrivateKeyPath,
 		caPrivateKeyPath:   caPrivateKeyPath,
@@ -55,6 +64,8 @@ func NewKMSKeyring(userPrivateKeyPath string, caPrivateKeyPath string) (sshAgent
 		caSigner:           caPrivateKey,
 		userSSHSigner:      userSSHSigner,
 		caSSHSigner:        caSSHSigner,
+		signingHTTPClient:  signingHTTPClient,
+		signingServerURL:   signingServerURL,
 	}, nil
 }
 
@@ -105,35 +116,34 @@ func (r *kmsKeyring) List() ([]*agent.Key, error) {
 		Blob:    caPublicKey.Marshal(),
 		Comment: "ca " + r.caPrivateKeyPath})
 
-	signingServer := server.NewSigningServer(r.caSSHSigner)
-
-	// TODO: Make HTTP request to get a signed certificate
-	// 1. GET /certificate/challenge # { value: "{ \"timestamp\": \"2020-01-01T10:00:00.000Z\" \"random\": \"...\"}", signature: "signed by CA key" }
-	challenge, err := signingServer.GenerateChallenge()
+	// GET /certificate/challenge # { value: "{ \"timestamp\": \"2020-01-01T10:00:00.000Z\" \"random\": \"...\"}", signature: "signed by CA key" }
+	var challenge server.Challenge
+	err := r.httpSignRequest("GET", "/certificate/challenge", nil, &challenge)
 	if err != nil {
-		// TODO: Error handling, fx. hard fail
+		return nil, err
 	}
 
-	// 2. POST /certificate # { challenge: "\...value", command: "", args: "", pubkey: "..." signature: "signed by user key" }
+	// POST /certificate # { challenge: "\...value", command: "", args: "", pubkey: "..." signature: "signed by user key" }
 	certRequest := &server.CertificateRequest{
-		Challenge: challenge,
+		Challenge: &challenge,
 		Command:   "some command", // TODO: Get command
 		Args:      []string{},     // TODO: Get args
 		PublicKey: string(ssh.MarshalAuthorizedKey(userPublicKey)),
 	}
+	// sign(challenge + command + args)
 	certRequest.SignRequest(rand.Reader, r.userSSHSigner)
 
-	// # Client: sign(challenge + command + args) Server: pubkey.verify(challenge + command + args, signature)
-	err = signingServer.VerifyCertificateRequest(certRequest)
+	// get back { certificate: "base64 encoded cert" }
+	var certResponse server.CertificateResponse
+	err = r.httpSignRequest("POST", "/certificate", certRequest, &certResponse)
 	if err != nil {
-		// TODO: Error handling
+		return nil, err
 	}
-
-	// Get back { certificate: "base64 encoded cert" }
-	userCert, err := signingServer.IssueUserCertificate(r.userSigner.SSHPublicKey())
+	userCertPubkey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(certResponse.Certificate))
 	if err != nil {
-		// TODO: Error handling
+		return nil, nil
 	}
+	userCert := userCertPubkey.(*ssh.Certificate)
 
 	// TODO: the go lang ssh cert implementation does not support forcing rsa-sha2-256-cert-v01@openssh.com or rsa-sha2-512-cert-v01@openssh.com
 	// https://cvsweb.openbsd.org/src/usr.bin/ssh/PROTOCOL.certkeys?annotate=HEAD
@@ -165,4 +175,39 @@ func (r *kmsKeyring) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.S
 	}
 
 	return nil, errors.New("not found")
+}
+
+func (r *kmsKeyring) httpSignRequest(method string, url string, request interface{}, response interface{}) error {
+	// Convert request to JSON and wrap in io.Reader
+	var requestBody io.Reader
+	if request != nil {
+		jsonBytes, err := json.Marshal(request)
+		if err != nil {
+			return err
+		}
+		requestBody = bytes.NewReader(jsonBytes)
+	}
+
+	// Do Request and ready body
+	challengeRequest, err := http.NewRequest(method, r.signingServerURL+url, requestBody)
+	if err != nil {
+		return err
+	}
+	challengeResponse, err := r.signingHTTPClient.Do(challengeRequest)
+	if err != nil {
+		return err
+	}
+	defer challengeResponse.Body.Close()
+	responseBody, err := ioutil.ReadAll(challengeResponse.Body)
+	if err != nil {
+		return err
+	}
+
+	// Convert JSON to object
+	err = json.Unmarshal(responseBody, response)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

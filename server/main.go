@@ -59,26 +59,30 @@ func NewSigningServer(caKey ssh.Signer) *SigningServer {
 }
 
 // VerifyCertificateRequest errors if it fails validation
-func (s *SigningServer) VerifyCertificateRequest(certRequest *CertificateRequest) (err error) {
+func (s *SigningServer) VerifyCertificateRequest(certRequest *CertificateRequest) (pubkey ssh.PublicKey, err error) {
 	// Validate challenge came from us
 	challenge := certRequest.Challenge
+	if challenge == nil {
+		return nil, fmt.Errorf("Challenge not set")
+	}
+
 	err = s.caKey.PublicKey().Verify(challenge.Value, challenge.Signature)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Unpack the value and ensure it's still valid
 	var value challengeValue
 	err = json.Unmarshal(challenge.Value, &value)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// TODO: Check if challenge expired
 	// TODO: Look up public key instead of parsing it
 	userPubkey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(certRequest.PublicKey))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	payload := GenerateSigningPayload(certRequest)
@@ -86,10 +90,10 @@ func (s *SigningServer) VerifyCertificateRequest(certRequest *CertificateRequest
 	// Verify that public key signed it
 	err = userPubkey.Verify(payload, certRequest.Signature)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return userPubkey, nil
 }
 
 // IssueUserCertificate issues ssh user certificate

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/connectedcars/auth-wrapper/gcemetadata"
+	"github.com/connectedcars/auth-wrapper/server"
 	"github.com/connectedcars/auth-wrapper/sshagent"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -139,12 +141,28 @@ func runCommandWithSSHAgent(config *SSHAgentConfig, command string, args []strin
 }
 
 func createSSHAgent(config *SSHAgentConfig) (sshAgent agent.Agent, err error) {
+
 	// TODO: Support mixing keys
 	if strings.HasPrefix(config.userPrivateKeyPath, "kms://") && strings.HasPrefix(config.caPrivateKeyPath, "kms://") {
 		var err error
 		userPrivateKeyPath := config.userPrivateKeyPath[6:]
 		caPrivateKeyPath := config.caPrivateKeyPath[6:]
-		sshAgent, err = sshagent.NewKMSKeyring(userPrivateKeyPath, caPrivateKeyPath)
+
+		// Start the signing server
+		caPrivateKey, err := sshagent.NewKMSSigner(caPrivateKeyPath, false)
+		if err != nil {
+			return nil, err
+		}
+		caSSHSigner, err := sshagent.NewSSHSignerFromKMSSigner(caPrivateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed NewSignerFromSigner from: %v", err)
+		}
+		go func() {
+			log.Fatal(server.StartHTTPSigningServer(caSSHSigner, ":3080"))
+		}()
+
+		// Setup sshAgent
+		sshAgent, err = sshagent.NewKMSKeyring(userPrivateKeyPath, caPrivateKeyPath, "http://localhost:3080")
 		if err != nil {
 			return nil, fmt.Errorf("Failed to setup KMS Keyring %s: %v", userPrivateKeyPath, err)
 		}
