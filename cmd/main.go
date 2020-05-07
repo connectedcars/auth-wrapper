@@ -111,7 +111,7 @@ type SSHAgentConfig struct {
 func runCommandWithSSHAgent(config *SSHAgentConfig, command string, args []string) (exitCode int, err error) {
 	agent, err := createSSHAgent(config)
 	if err != nil {
-		return 255, fmt.Errorf("Failed to setup ssh agent: %v\n", err)
+		return 255, fmt.Errorf("failed to setup ssh agent: %v", err)
 	}
 
 	sshAuthSock, err := sshagent.StartSSHAgentServer(agent)
