@@ -1,4 +1,4 @@
-package sshagent
+package google
 
 // TODO: Make generic so it can be used with other key implementation
 
