@@ -6,7 +6,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['version']
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['-c', 'find $HOME']
+    args: ['-c', 'find $$HOME']
     entrypoint: "/bin/bash"
   #
   # Build KMS auth wrappers
