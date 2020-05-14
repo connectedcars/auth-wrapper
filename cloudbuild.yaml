@@ -2,11 +2,20 @@ steps:
   # Pull a modern version of docker
   - name: 'gcr.io/cloud-builders/docker'
     args: ['pull', 'gcr.io/cloud-builders/docker:latest']
+  # Workaround for https://github.com/moby/moby/issues/39120
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker/dockerfile:experimental']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker/dockerfile:1.0-experimental']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker.io/docker/dockerfile-copy:v0.1.9']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'ubuntu:19.10']
   # Check version
   - name: 'gcr.io/cloud-builders/docker'
     args: ['version']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['-c', 'find $$HOME']
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: ['-c', 'find $$HOME && export']
     entrypoint: "/bin/bash"
   #
   # Build KMS auth wrappers
