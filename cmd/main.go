@@ -10,8 +10,6 @@ import (
 	"strings"
 	"syscall"
 
-	"cloud.google.com/go/compute/metadata"
-	"github.com/connectedcars/auth-wrapper/gcemetadata"
 	"github.com/connectedcars/auth-wrapper/kms/google"
 	"github.com/connectedcars/auth-wrapper/server"
 	"github.com/connectedcars/auth-wrapper/sshagent"
@@ -57,48 +55,40 @@ func main() {
 		args = os.Args[2:]
 	}
 
-	gceMetaDataURL := os.Getenv("GCE_METADATA_URL")
-	if gceMetaDataURL == "auto" {
-		if metadata.OnGCE() {
-			gcemetadata.StartMetadateServer("http://169.254.169.254")
-		}
-	} else if gceMetaDataURL == "emulate" {
-		// Start emulation server
-		gcemetadata.StartMetadateServer("")
-	} else if gceMetaDataURL != "" {
-		gcemetadata.StartMetadateServer(gceMetaDataURL)
-	}
-
-	sshKeyPath := os.Getenv("SSH_KEY_PATH")
-	sshKeyPassword := os.Getenv("SSH_KEY_PASSWORD")
-	os.Unsetenv("SSH_KEY_PATH")
-	os.Unsetenv("SSH_KEY_PASSWORD")
-
 	sshCaKeyPath := os.Getenv("SSH_CA_KEY_PATH")
 	sshCaKeyPassword := os.Getenv("SSH_CA_KEY_PASSWORD")
+	sshSigningServerAddress := os.Getenv("SSH_SIGNING_SERVER_LISTEN_ADDRESS")
 	os.Unsetenv("SSH_CA_KEY_PATH")
 	os.Unsetenv("SSH_CA_KEY_PASSWORD")
-
-	if sshCaKeyPath != "" {
-
+	os.Unsetenv("SSH_SIGNING_SERVER_LISTEN_ADDRESS")
+	if sshCaKeyPath != "" && sshSigningServerAddress != "" {
+		caPublickey, err := createSigningServer(sshCaKeyPath, sshCaKeyPassword, sshSigningServerAddress)
+		if err != nil {
+			log.Fatalf("createSigningServer: %v", err)
+		}
+		fmt.Fprintf(os.Stderr, "%s %s\n", strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(caPublickey)), "\n"), "ca "+sshCaKeyPath)
 	}
 
 	// Run command with SSH Agent
+	sshKeyPath := os.Getenv("SSH_KEY_PATH")
+	sshKeyPassword := os.Getenv("SSH_KEY_PASSWORD")
+	sshSigningServerURL := os.Getenv("SSH_SIGNING_SERVER_URL")
+	os.Unsetenv("SSH_KEY_PATH")
+	os.Unsetenv("SSH_KEY_PASSWORD")
 	var exitCode int
 	var err error
 	if sshKeyPath != "" {
 		exitCode, err = runCommandWithSSHAgent(&SSHAgentConfig{
 			userPrivateKeyPath:     sshKeyPath,
 			userPrivateKeyPassword: sshKeyPassword,
-			caPrivateKeyPath:       sshCaKeyPath,
-			caPrivateKeyPassword:   sshCaKeyPassword,
+			sshSigningServerURL:    sshSigningServerURL,
 		}, command, args)
 
 	} else {
 		exitCode, err = runCommand(command, args)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		log.Fatalf("runCommand: %v", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
@@ -109,8 +99,7 @@ func main() {
 type SSHAgentConfig struct {
 	userPrivateKeyPath     string
 	userPrivateKeyPassword string
-	caPrivateKeyPath       string
-	caPrivateKeyPassword   string
+	sshSigningServerURL    string
 }
 
 func runCommandWithSSHAgent(config *SSHAgentConfig, command string, args []string) (exitCode int, err error) {
@@ -146,32 +135,18 @@ func runCommandWithSSHAgent(config *SSHAgentConfig, command string, args []strin
 }
 
 func createSSHAgent(config *SSHAgentConfig) (sshAgent agent.Agent, err error) {
-
 	// TODO: Support mixing keys
-	if strings.HasPrefix(config.userPrivateKeyPath, "kms://") && strings.HasPrefix(config.caPrivateKeyPath, "kms://") {
+	if strings.HasPrefix(config.userPrivateKeyPath, "kms://") {
 		var err error
 		userPrivateKeyPath := config.userPrivateKeyPath[6:]
-		caPrivateKeyPath := config.caPrivateKeyPath[6:]
-
-		// Start the signing server
-		caPrivateKey, err := google.NewKMSSigner(caPrivateKeyPath, false)
-		if err != nil {
-			return nil, err
-		}
-		caSSHSigner, err := google.NewSSHSignerFromKMSSigner(caPrivateKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed NewSignerFromSigner from: %v", err)
-		}
-		go func() {
-			log.Fatal(server.StartHTTPSigningServer(caSSHSigner, ":3080"))
-		}()
 
 		// Setup sshAgent
-		sshAgent, err = google.NewKMSKeyring(userPrivateKeyPath, caPrivateKeyPath, "http://localhost:3080")
+		sshAgent, err = google.NewKMSKeyring(userPrivateKeyPath, config.sshSigningServerURL)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to setup KMS Keyring %s: %v", userPrivateKeyPath, err)
 		}
 	} else {
+		// TODO: Create generic keyring that takes array of ssh.Signer's
 		var privateKey interface{}
 		privateKeyBytes, err := ioutil.ReadFile(config.userPrivateKeyPath)
 		if err != nil {
@@ -188,6 +163,34 @@ func createSSHAgent(config *SSHAgentConfig) (sshAgent agent.Agent, err error) {
 		}
 	}
 	return sshAgent, nil
+}
+
+func createSigningServer(caPrivateKeyPath string, sshCaKeyPassword string, address string) (ssh.PublicKey, error) {
+	var caPublicKey ssh.PublicKey
+	if strings.HasPrefix(caPrivateKeyPath, "kms://") {
+		var err error
+		kmsCaPrivateKeyPath := caPrivateKeyPath[6:]
+
+		// Start the signing server
+		caPrivateKey, err := google.NewKMSSigner(kmsCaPrivateKeyPath, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed google.NewKMSSigner %v", err)
+		}
+		caSSHSigner, err := google.NewSSHSignerFromKMSSigner(caPrivateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed google.NewSignerFromSigner from: %v", err)
+		}
+
+		go func() {
+			log.Fatal(server.StartHTTPSigningServer(caSSHSigner, address))
+		}()
+		caPublicKey = caPrivateKey.SSHPublicKey()
+
+	} else {
+		return nil, fmt.Errorf("Not implemented yet")
+	}
+
+	return caPublicKey, nil
 }
 
 func runCommand(command string, args []string) (exitCode int, err error) {
