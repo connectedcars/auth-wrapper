@@ -10,30 +10,30 @@ import (
 )
 
 type wrappedSigner struct {
-	signer KMSSigner
-	pubKey ssh.PublicKey
+	signer    crypto.Signer
+	digest    crypto.Hash
+	publicKey ssh.PublicKey
 }
 
-// NewSSHSignerFromKMSSigner takes a KMSSigner implementation and
-// returns a corresponding ssh.Signer interface.
-func NewSSHSignerFromKMSSigner(signer KMSSigner) (ssh.Signer, error) {
-	pubKey, err := ssh.NewPublicKey(signer.Public())
+// NewSSHSignerFromSigner takes a crypto.Signer implementation and returns a corresponding ssh.Signer interface
+func NewSSHSignerFromSigner(signer crypto.Signer, digest crypto.Hash) (ssh.AlgorithmSigner, error) {
+	publicKey, err := ssh.NewPublicKey(signer.Public())
 	if err != nil {
 		return nil, err
 	}
-	return &wrappedSigner{signer, pubKey}, nil
+	return &wrappedSigner{
+		signer:    signer,
+		publicKey: publicKey,
+		digest:    digest,
+	}, nil
 }
 
 func (s *wrappedSigner) PublicKey() ssh.PublicKey {
-	return s.pubKey
+	return s.publicKey
 }
 
 func (s *wrappedSigner) Sign(rand io.Reader, data []byte) (*ssh.Signature, error) {
-	return s.SignWithAlgorithm(rand, data)
-}
-
-func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte) (*ssh.Signature, error) {
-	hashFunc := s.signer.Digest()
+	hashFunc := s.digest
 
 	var digest []byte
 	if hashFunc != 0 {
@@ -60,13 +60,11 @@ func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte) (*ssh.Sig
 			algorithm = ssh.SigAlgoRSASHA2512
 		}
 	} else {
-		algorithm = s.pubKey.Type()
+		algorithm = s.publicKey.Type()
 	}
 
-	// crypto.Signer.Sign is expected to return an ASN.1-encoded signature
-	// for ECDSA and DSA, but that's not the encoding expected by SSH, so
-	// re-encode.
-	switch s.pubKey.Type() {
+	// crypto.Signer.Sign is expected to return an ASN.1-encoded signature for ECDSA and DSA, but that's not the encoding expected by SSH, so re-encode.
+	switch s.publicKey.Type() {
 	case "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521", "ssh-dss":
 		type asn1Signature struct {
 			R, S *big.Int
@@ -77,7 +75,7 @@ func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte) (*ssh.Sig
 			return nil, err
 		}
 
-		switch s.pubKey.Type() {
+		switch s.publicKey.Type() {
 		case "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521":
 			signature = ssh.Marshal(asn1Sig)
 		case "ssh-dss":
@@ -93,4 +91,9 @@ func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte) (*ssh.Sig
 		Format: algorithm,
 		Blob:   signature,
 	}, nil
+}
+
+func (s *wrappedSigner) SignWithAlgorithm(rand io.Reader, data []byte, algorithm string) (*ssh.Signature, error) {
+	// Google KSM does not support using other digest algorithms other than what they key was created with so we ignore the algorithm
+	return s.Sign(rand, data)
 }

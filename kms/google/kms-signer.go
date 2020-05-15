@@ -14,7 +14,6 @@ import (
 	"log"
 
 	cloudkms "cloud.google.com/go/kms/apiv1"
-	"golang.org/x/crypto/ssh"
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 )
 
@@ -23,18 +22,16 @@ import (
 type KMSSigner interface {
 	crypto.Signer
 	Digest() crypto.Hash
-	SSHPublicKey() ssh.PublicKey
 }
 
 // kmsSigner is a key
 type kmsSigner struct {
-	ctx          context.Context
-	client       *cloudkms.KeyManagementClient
-	keyName      string
-	publicKey    crypto.PublicKey
-	sshPublicKey ssh.PublicKey
-	digest       crypto.Hash
-	forceDigest  bool
+	ctx         context.Context
+	client      *cloudkms.KeyManagementClient
+	keyName     string
+	publicKey   crypto.PublicKey
+	digest      crypto.Hash
+	forceDigest bool
 }
 
 // CryptoHashLookup maps crypto.hash to string name
@@ -80,11 +77,6 @@ func NewKMSSigner(keyName string, forceDigest bool) (signer KMSSigner, err error
 		return nil, fmt.Errorf("x509.ParsePKIXPublicKey: %+v", err)
 	}
 
-	sshPublicKey, err := ssh.NewPublicKey(abstractKey)
-	if err != nil {
-		return nil, fmt.Errorf("ssh.ParsePublicKey: %+v", err)
-	}
-
 	var publicKey crypto.PublicKey
 	var digestType crypto.Hash
 	switch abstractKey.(type) {
@@ -119,13 +111,12 @@ func NewKMSSigner(keyName string, forceDigest bool) (signer KMSSigner, err error
 	}
 
 	return &kmsSigner{
-		keyName:      keyName,
-		ctx:          ctx,
-		client:       client,
-		publicKey:    publicKey,
-		digest:       digestType,
-		sshPublicKey: sshPublicKey,
-		forceDigest:  forceDigest,
+		keyName:     keyName,
+		ctx:         ctx,
+		client:      client,
+		publicKey:   publicKey,
+		digest:      digestType,
+		forceDigest: forceDigest,
 	}, nil
 }
 
@@ -175,11 +166,6 @@ func (kmss *kmsSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpt
 // Public fetches public key
 func (kmss *kmsSigner) Public() crypto.PublicKey {
 	return kmss.publicKey
-}
-
-// SSHPublicKey fetches public key in ssh format
-func (kmss *kmsSigner) SSHPublicKey() ssh.PublicKey {
-	return kmss.sshPublicKey
 }
 
 // Digest returns hash algo used for this key
