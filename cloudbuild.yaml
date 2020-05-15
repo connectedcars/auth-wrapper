@@ -6,7 +6,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
-      '--target git-kms',
+      '--target=git-kms',
       '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:latest', 
@@ -30,7 +30,7 @@ steps:
     dir: localkey
     args: [
       'build', 
-       '--target git-local',
+      '--target=git-local',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME:latest', '.'
       ]
