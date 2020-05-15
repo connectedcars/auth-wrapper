@@ -15,6 +15,9 @@ steps:
   # Test auth wrapped git using KSM key
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA'
     args: ['clone', 'git@github.com:connectedcars/private-module.git']
+  - name: 'gcr.io/cloud-builders/git'
+    entrypoint: 'bash'
+    args: ['-c', 'rm -rf private-module']
   #
   # Build embedded key auth wrappers
   #
@@ -38,6 +41,9 @@ steps:
     args: ['clone', 'git@github.com:connectedcars/private-module.git']
     secretEnv:
       - 'SSH_KEY_PASSWORD'
+  - name: 'gcr.io/cloud-builders/git'
+    entrypoint: 'bash'
+    args: ['-c', 'rm -rf private-module']
 secrets:
 - kmsKeyName: projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/connectedcars-builder
   secretEnv:
