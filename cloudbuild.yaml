@@ -27,7 +27,6 @@ steps:
           ]
   # Build auth wrapper git image
   - name: 'gcr.io/cloud-builders/docker'
-    dir: localkey
     args: [
       'build', 
       '--target=git-local',
