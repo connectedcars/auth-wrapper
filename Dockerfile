@@ -18,7 +18,7 @@ RUN go version
 
 ENV GO111MODULE=on
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.versionString=$VERSION'" ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.versionString=$VERSION'" ./cmd/authwrapper
 
 #
 # Authwrapped git with KMS keys
