@@ -2,8 +2,10 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -20,8 +22,9 @@ type HTTPSigningServer struct {
 }
 
 // StartHTTPSigningServer returns a HTTPSigningServer
-func StartHTTPSigningServer(caKey ssh.Signer, listenAddr string) error {
-	signingServer := NewSigningServer(caKey)
+func StartHTTPSigningServer(caKey ssh.Signer, allowedKeys []AllowedKey, listenAddr string) error {
+	signingServer := NewSigningServer(caKey, allowedKeys)
+
 	httpSigningServer := &HTTPSigningServer{signingServer: signingServer}
 
 	http.Handle("/", httpSigningServer)
@@ -80,12 +83,46 @@ func (s *HTTPSigningServer) postCertificate(w http.ResponseWriter, r *http.Reque
 		return nil, &StatusError{400, err}
 	}
 
-	userPublickey, err := s.signingServer.VerifyCertificateRequest(&certRequest)
+	// Validate input
+	if certRequest.Challenge == nil {
+		return nil, &StatusError{400, fmt.Errorf("challenge not set")}
+	}
+	if certRequest.Principals == nil {
+		return nil, &StatusError{400, fmt.Errorf("principals not set")}
+	}
+	if certRequest.Signature == nil {
+		return nil, &StatusError{400, fmt.Errorf("signature not set")}
+	}
+
+	// Check if this request is allowed
+	allowedKey, err := s.signingServer.VerifyCertificateRequest(&certRequest)
 	if err != nil {
 		return nil, &StatusError{400, err}
 	}
+	if allowedKey == nil {
+		return nil, &StatusError{401, fmt.Errorf("Key not allowed")}
+	}
 
-	userCert, err := s.signingServer.IssueUserCertificate(userPublickey)
+	// Check requested principals are allowed
+	for _, requestedPrincipal := range certRequest.Principals {
+		for i, allowedPrincipal := range allowedKey.Principals {
+			match, err := filepath.Match(allowedPrincipal, requestedPrincipal)
+			if err != nil {
+				return nil, &StatusError{500, fmt.Errorf("allowed pattern is malformed")}
+			}
+			if match {
+				break
+			}
+			if i == len(allowedKey.Principals)-1 {
+				return nil, &StatusError{400, fmt.Errorf("requested principal '%s' not allowed", requestedPrincipal)}
+			}
+		}
+	}
+
+	// TODO: Check if command is allowed https://github.com/tlbdk/socketauth/blob/master/src/sshutils.test.js
+	// TODO: Add SSH command to Options so we are sure only that command will be run
+
+	userCert, err := s.signingServer.IssueUserCertificate(allowedKey, certRequest.Principals)
 	if err != nil {
 		return nil, &StatusError{500, err}
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"time"
@@ -25,11 +26,12 @@ type challengeValue struct {
 
 // CertificateRequest for SSH user certificate
 type CertificateRequest struct {
-	Challenge *Challenge     `json:"challenge"`
-	Command   string         `json:"command"`
-	Args      []string       `json:"args"`
-	PublicKey string         `json:"publicKey"`
-	Signature *ssh.Signature `json:"signature"`
+	Challenge  *Challenge     `json:"challenge"`
+	Principals []string       `json:"principals"`
+	Command    string         `json:"command"`
+	Args       []string       `json:"args"`
+	PublicKey  string         `json:"publicKey"`
+	Signature  *ssh.Signature `json:"signature"`
 }
 
 // SignRequest signs request with provided user key : Move to common lib as this is used by the client
@@ -50,23 +52,29 @@ type CertificateResponse struct {
 
 // SigningServer struct
 type SigningServer struct {
-	caKey ssh.Signer
+	caKey          ssh.Signer
+	allowedKeysMap map[string]*AllowedKey
 }
 
 // NewSigningServer creates a new server
-func NewSigningServer(caKey ssh.Signer) *SigningServer {
-	return &SigningServer{caKey: caKey}
+func NewSigningServer(caKey ssh.Signer, allowedKeys []AllowedKey) *SigningServer {
+	var allowedKeysMap = map[string]*AllowedKey{}
+	for i, allowedKey := range allowedKeys {
+		pubkeyString := strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(allowedKey.Key)), "\n")
+		allowedKeysMap[pubkeyString] = &allowedKeys[i]
+	}
+	return &SigningServer{
+		caKey:          caKey,
+		allowedKeysMap: allowedKeysMap,
+	}
 }
 
 // VerifyCertificateRequest errors if it fails validation
-func (s *SigningServer) VerifyCertificateRequest(certRequest *CertificateRequest) (pubkey ssh.PublicKey, err error) {
+func (s *SigningServer) VerifyCertificateRequest(certRequest *CertificateRequest) (*AllowedKey, error) {
 	// Validate challenge came from us
 	challenge := certRequest.Challenge
-	if challenge == nil {
-		return nil, fmt.Errorf("Challenge not set")
-	}
 
-	err = s.caKey.PublicKey().Verify(challenge.Value, challenge.Signature)
+	err := s.caKey.PublicKey().Verify(challenge.Value, challenge.Signature)
 	if err != nil {
 		return nil, err
 	}
@@ -77,37 +85,37 @@ func (s *SigningServer) VerifyCertificateRequest(certRequest *CertificateRequest
 	if err != nil {
 		return nil, err
 	}
-
 	// TODO: Check if challenge expired
-	// TODO: Look up public key instead of parsing it
-	userPubkey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(certRequest.PublicKey))
-	if err != nil {
-		return nil, err
+
+	allowedKey := s.allowedKeysMap[certRequest.PublicKey]
+	if allowedKey == nil {
+		return nil, nil
 	}
+	// TODO: Check if allowedKey is expired?
 
 	payload := GenerateSigningPayload(certRequest)
 
 	// Verify that public key signed it
-	err = userPubkey.Verify(payload, certRequest.Signature)
+	err = allowedKey.Key.Verify(payload, certRequest.Signature)
 	if err != nil {
 		return nil, err
 	}
 
-	return userPubkey, nil
+	return allowedKey, nil
 }
 
 // IssueUserCertificate issues ssh user certificate
-func (s *SigningServer) IssueUserCertificate(userPublicKey ssh.PublicKey) (userCertificate *ssh.Certificate, err error) {
+func (s *SigningServer) IssueUserCertificate(allowedKey *AllowedKey, principals []string) (userCertificate *ssh.Certificate, err error) {
 	userCert := &ssh.Certificate{
-		Key:             userPublicKey,
-		KeyId:           "test",
+		Key:             allowedKey.Key,
+		KeyId:           strconv.Itoa(allowedKey.Index),
 		CertType:        ssh.UserCert,
-		ValidPrincipals: []string{"tlb"},
+		ValidPrincipals: principals,
 		ValidAfter:      0,
-		ValidBefore:     ssh.CertTimeInfinity, // uint64(time.Now().Add(time.Minute * 60).Unix()),
+		ValidBefore:     allowedKey.ValidBefore,
 		Permissions: ssh.Permissions{
-			CriticalOptions: map[string]string{},
-			Extensions:      map[string]string{},
+			CriticalOptions: allowedKey.Options,
+			Extensions:      allowedKey.Extensions,
 		},
 	}
 
@@ -127,8 +135,9 @@ func GenerateSigningPayload(certRequest *CertificateRequest) (payload []byte) {
 	payload = challenge.Value
 	payload = append(payload, challenge.Signature.Format...)
 	payload = append(payload, challenge.Signature.Blob...)
+	payload = append(payload, strings.Join(certRequest.Principals, ",")...)
 	payload = append(payload, certRequest.Command...)
-	payload = append(payload, strings.Join(certRequest.Args, "")...)
+	payload = append(payload, strings.Join(certRequest.Args, ",")...)
 	return payload
 }
 

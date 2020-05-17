@@ -2,9 +2,11 @@ package main
 
 import (
 	"crypto/rand"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/connectedcars/auth-wrapper/kms/google"
@@ -16,24 +18,34 @@ import (
 
 // Config contains the auth wrapper configuration
 type Config struct {
-	WrapCommand             string
+	Command                 string
+	Args                    []string
+	RequestedPrincipals     []string
 	SSHKeyPath              string
 	SSHKeyPassword          string
 	SSHSigningServerURL     string
 	SSHCaKeyPath            string
 	SSHCaKeyPassword        string
+	SSHCaAuthorizedKeysPath string
 	SSHSigningServerAddress string
 	SSHAgentSocket          string
 }
 
+var principalsFlag = flag.String("principals", "", "requested principals")
+
 func parseEnvironment() (*Config, error) {
+	flag.Parse()
+
 	config := &Config{
-		WrapCommand:             os.Getenv("WRAP_COMMAND"),
+		Command:                 os.Getenv("WRAP_COMMAND"),
+		Args:                    os.Args[1:],
+		RequestedPrincipals:     strings.Split(os.Getenv("PRINCIPALS"), ","),
 		SSHKeyPath:              os.Getenv("SSH_KEY_PATH"),
 		SSHKeyPassword:          os.Getenv("SSH_KEY_PASSWORD"),
 		SSHSigningServerURL:     os.Getenv("SSH_SIGNING_SERVER_URL"),
 		SSHCaKeyPath:            os.Getenv("SSH_CA_KEY_PATH"),
 		SSHCaKeyPassword:        os.Getenv("SSH_CA_KEY_PASSWORD"),
+		SSHCaAuthorizedKeysPath: os.Getenv("SSH_CA_AUTHORIZED_KEYS_PATH"),
 		SSHSigningServerAddress: os.Getenv("SSH_SIGNING_SERVER_LISTEN_ADDRESS"),
 		SSHAgentSocket:          os.Getenv("SSH_AUTH_SOCK"),
 	}
@@ -46,7 +58,41 @@ func parseEnvironment() (*Config, error) {
 	os.Unsetenv("SSH_SIGNING_SERVER_LISTEN_ADDRESS")
 	os.Unsetenv("SSH_AUTH_SOCK")
 
-	// TODO: Do basic error validation
+	if *principalsFlag != "" {
+		config.RequestedPrincipals = strings.Split(*principalsFlag, ",")
+	}
+
+	if config.Command == "" {
+		processName := filepath.Base(os.Args[0])
+		if processName != "auth-wrapper" && processName != "__debug_bin" {
+			// Get executable path
+			ex, err := os.Executable()
+			if err != nil {
+				panic(err)
+			}
+			processPath := filepath.Dir(ex)
+
+			// Remove wrapper location path
+			currentPath := os.Getenv("PATH")
+			cleanedPath := strings.Replace(currentPath, processPath+"/:", "", 1)
+			cleanedPath = strings.Replace(cleanedPath, processPath+":", "", 1)
+			os.Setenv("PATH", cleanedPath)
+
+			config.Command = processName
+		} else {
+			if len(os.Args) < 2 {
+				return nil, fmt.Errorf("auth-wrapper cmd args")
+			}
+			config.Command = os.Args[1]
+			config.Args = os.Args[2:]
+		}
+	}
+
+	// TODO: Do more config error validation
+
+	if config.SSHSigningServerURL != "" && len(config.RequestedPrincipals) == 0 {
+		return nil, fmt.Errorf("When SSH_SIGNING_SERVER_URL is set a list of principals needs to be provided")
+	}
 
 	return config, nil
 }
@@ -56,7 +102,6 @@ func setupKeyring(config *Config) (agent.ExtendedAgent, error) {
 	var certificates []sshagent.SSHCertificate
 
 	if config.SSHKeyPath != "" {
-		var userSigner ssh.AlgorithmSigner
 		if strings.HasPrefix(config.SSHKeyPath, "kms://") {
 			var err error
 			userPrivateKeyPath := config.SSHKeyPath[6:]
@@ -70,9 +115,8 @@ func setupKeyring(config *Config) (agent.ExtendedAgent, error) {
 			}
 			signers = append(signers, sshagent.SSHAlgorithmSigner{
 				Signer:  signer,
-				Comment: "google kms key " + userPrivateKeyPath,
+				Comment: config.SSHKeyPath,
 			})
-			userSigner = signer
 		} else {
 			privateKeyBytes, err := ioutil.ReadFile(config.SSHKeyPath)
 			if err != nil {
@@ -92,47 +136,9 @@ func setupKeyring(config *Config) (agent.ExtendedAgent, error) {
 			}
 			signers = append(signers, sshagent.SSHAlgorithmSigner{
 				Signer:  algorithmSigner,
-				Comment: "local key " + config.SSHKeyPath,
-			})
-			userSigner = algorithmSigner
-		}
-
-		if config.SSHSigningServerURL != "" {
-			// GET /certificate/challenge # { value: "{ \"timestamp\": \"2020-01-01T10:00:00.000Z\" \"random\": \"...\"}", signature: "signed by CA key" }
-			var challenge server.Challenge
-			err := httpJSONRequest("GET", config.SSHSigningServerURL+"/certificate/challenge", nil, &challenge)
-			if err != nil {
-				return nil, err
-			}
-
-			// POST /certificate # { challenge: "\...value", command: "", args: "", pubkey: "..." signature: "signed by user key" }
-			certRequest := &server.CertificateRequest{
-				Challenge: &challenge,
-				Command:   "some command", // TODO: Get command
-				Args:      []string{},     // TODO: Get args
-				PublicKey: string(ssh.MarshalAuthorizedKey(userSigner.PublicKey())),
-			}
-			// sign(challenge + command + args)
-			certRequest.SignRequest(rand.Reader, userSigner)
-
-			// get back { certificate: "base64 encoded cert" }
-			var certResponse server.CertificateResponse
-			err = httpJSONRequest("POST", config.SSHSigningServerURL+"/certificate", certRequest, &certResponse)
-			if err != nil {
-				return nil, err
-			}
-			userCertPubkey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(certResponse.Certificate))
-			if err != nil {
-				return nil, nil
-			}
-			userCert := userCertPubkey.(*ssh.Certificate)
-
-			certificates = append(certificates, sshagent.SSHCertificate{
-				Certificate: userCert,
-				Comment:     "user key " + config.SSHKeyPath,
+				Comment: config.SSHKeyPath,
 			})
 		}
-
 	}
 
 	if config.SSHAgentSocket != "" {
@@ -150,10 +156,60 @@ func setupKeyring(config *Config) (agent.ExtendedAgent, error) {
 			signer := sshagent.NewSSHAlgorithmSigner(agent, key)
 			signers = append(signers, sshagent.SSHAlgorithmSigner{
 				Signer:  signer,
-				Comment: "agent key",
+				Comment: "agent key " + key.Comment,
 			})
 		}
 	}
 
-	return sshagent.NewSSHAlgorithmSignerKeyring(&signers, &certificates)
+	if config.SSHSigningServerURL != "" {
+		// TODO: Do something with the errors
+		var errors []error
+		for _, signer := range signers {
+			userCert, err := fetchUserCert(config.SSHSigningServerURL, signer.Signer, config.Command, config.Args, config.RequestedPrincipals)
+			if err != nil {
+				errors = append(errors, err)
+				continue
+			}
+			certificates = append(certificates, sshagent.SSHCertificate{
+				Certificate: userCert,
+				Comment:     "key " + config.SSHKeyPath,
+			})
+		}
+	}
+
+	return sshagent.NewSSHAlgorithmSignerKeyring(signers, certificates)
+}
+
+func fetchUserCert(signingServerURL string, signer ssh.AlgorithmSigner, command string, args []string, principals []string) (*ssh.Certificate, error) {
+	// GET /certificate/challenge # { value: "{ \"timestamp\": \"2020-01-01T10:00:00.000Z\" \"random\": \"...\"}", signature: "signed by CA key" }
+	var challenge server.Challenge
+	err := httpJSONRequest("GET", signingServerURL+"/certificate/challenge", nil, &challenge)
+	if err != nil {
+		return nil, err
+	}
+
+	// POST /certificate # { challenge: "\...value", command: "", args: "", pubkey: "..." signature: "signed by user key" }
+	certRequest := &server.CertificateRequest{
+		Challenge:  &challenge,
+		Command:    command,
+		Args:       args,
+		Principals: principals,
+		PublicKey:  strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(signer.PublicKey())), "\n"),
+	}
+
+	// sign(challenge + command + args)
+	certRequest.SignRequest(rand.Reader, signer)
+
+	// get back { certificate: "base64 encoded cert" }
+	var certResponse server.CertificateResponse
+	err = httpJSONRequest("POST", signingServerURL+"/certificate", certRequest, &certResponse)
+	if err != nil {
+		return nil, err
+	}
+	userCertPubkey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(certResponse.Certificate))
+	if err != nil {
+		return nil, nil
+	}
+	userCert := userCertPubkey.(*ssh.Certificate)
+	return userCert, nil
 }

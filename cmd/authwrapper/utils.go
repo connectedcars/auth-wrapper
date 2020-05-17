@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -39,7 +40,7 @@ func runCommandWithSSHAgent(agent agent.ExtendedAgent, command string, args []st
 	return runCommand(command, args)
 }
 
-func startSigningServer(caPrivateKeyPath string, sshCaKeyPassword string, address string) (ssh.PublicKey, error) {
+func startSigningServer(caPrivateKeyPath string, keyPassword string, authorizedKeysPath, address string) (ssh.PublicKey, error) {
 	var caPublicKey ssh.PublicKey
 	if strings.HasPrefix(caPrivateKeyPath, "kms://") {
 		var err error
@@ -52,11 +53,21 @@ func startSigningServer(caPrivateKeyPath string, sshCaKeyPassword string, addres
 		}
 		caSSHSigner, err := google.NewSSHSignerFromSigner(caPrivateKey, caPrivateKey.Digest())
 		if err != nil {
-			return nil, fmt.Errorf("failed google.NewSignerFromSigner from: %v", err)
+			return nil, fmt.Errorf("failed google.NewSSHSignerFromSigner: %v", err)
+		}
+
+		authorizedKeysLines, err := readLines(authorizedKeysPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed readLines: %v", err)
+		}
+
+		allowedKeys, err := server.ParseAuthorizedKeys(authorizedKeysLines)
+		if err != nil {
+			return nil, fmt.Errorf("failed parse ParseAuthorizedKeys: %v", err)
 		}
 
 		go func() {
-			log.Fatal(server.StartHTTPSigningServer(caSSHSigner, address))
+			log.Fatal(server.StartHTTPSigningServer(caSSHSigner, allowedKeys, address))
 		}()
 		caPublicKey = caSSHSigner.PublicKey()
 
@@ -90,11 +101,11 @@ func runCommand(command string, args []string) (exitCode int, err error) {
 	return 0, nil
 }
 
-func httpJSONRequest(method string, url string, request interface{}, response interface{}) error {
+func httpJSONRequest(method string, url string, requestData interface{}, responseData interface{}) error {
 	// Convert request to JSON and wrap in io.Reader
 	var requestBody io.Reader
-	if request != nil {
-		jsonBytes, err := json.Marshal(request)
+	if requestData != nil {
+		jsonBytes, err := json.Marshal(requestData)
 		if err != nil {
 			return err
 		}
@@ -102,25 +113,44 @@ func httpJSONRequest(method string, url string, request interface{}, response in
 	}
 
 	// Do Request and ready body
-	challengeRequest, err := http.NewRequest(method, url, requestBody)
+	httpRequest, err := http.NewRequest(method, url, requestBody)
 	if err != nil {
 		return err
 	}
-	challengeResponse, err := httpClient.Do(challengeRequest)
+	httpResponse, err := httpClient.Do(httpRequest)
 	if err != nil {
 		return err
 	}
-	defer challengeResponse.Body.Close()
-	responseBody, err := ioutil.ReadAll(challengeResponse.Body)
+	defer httpResponse.Body.Close()
+	responseBody, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
 		return err
+	}
+
+	if httpResponse.StatusCode != 200 {
+		return fmt.Errorf("%s %s failed(%d): %s", method, url, httpResponse.StatusCode, responseBody)
 	}
 
 	// Convert JSON to object
-	err = json.Unmarshal(responseBody, response)
+	err = json.Unmarshal(responseBody, responseData)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse JSON in '%s': %v", responseBody, err)
 	}
 
 	return nil
+}
+
+func readLines(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
 }

@@ -23,12 +23,12 @@ type SSHCertificate struct {
 }
 
 type sshAlgorithmSignerKeyring struct {
-	sshAlgorithmSigners *[]SSHAlgorithmSigner
-	sshCertificates     *[]SSHCertificate
+	sshAlgorithmSigners []SSHAlgorithmSigner
+	sshCertificates     []SSHCertificate
 }
 
 // NewSSHAlgorithmSignerKeyring returns an ExtendedAgent
-func NewSSHAlgorithmSignerKeyring(sshAlgorithmSigners *[]SSHAlgorithmSigner, sshCertificates *[]SSHCertificate) (agent.ExtendedAgent, error) {
+func NewSSHAlgorithmSignerKeyring(sshAlgorithmSigners []SSHAlgorithmSigner, sshCertificates []SSHCertificate) (agent.ExtendedAgent, error) {
 	return &sshAlgorithmSignerKeyring{
 		sshAlgorithmSigners: sshAlgorithmSigners,
 		sshCertificates:     sshCertificates,
@@ -70,14 +70,14 @@ func (r *sshAlgorithmSignerKeyring) List() ([]*agent.Key, error) {
 	// TODO: the go lang ssh cert implementation does not support forcing rsa-sha2-256-cert-v01@openssh.com or rsa-sha2-512-cert-v01@openssh.com
 	// https://cvsweb.openbsd.org/src/usr.bin/ssh/PROTOCOL.certkeys?annotate=HEAD
 	// To fix this we would need to replace the keyname in the certBlob with one of the names listed.
-	for _, certificate := range *r.sshCertificates {
+	for _, certificate := range r.sshCertificates {
 		keys = append(keys, &agent.Key{
 			Format:  certificate.Certificate.Type(),
 			Blob:    certificate.Certificate.Marshal(),
 			Comment: "cert " + certificate.Comment})
 	}
 
-	for _, algorithmSigner := range *r.sshAlgorithmSigners {
+	for _, algorithmSigner := range r.sshAlgorithmSigners {
 		keys = append(keys, &agent.Key{
 			Format:  algorithmSigner.Signer.PublicKey().Type(),
 			Blob:    algorithmSigner.Signer.PublicKey().Marshal(),
@@ -94,7 +94,7 @@ func (r *sshAlgorithmSignerKeyring) Sign(key ssh.PublicKey, data []byte) (*ssh.S
 func (r *sshAlgorithmSignerKeyring) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.SignatureFlags) (*ssh.Signature, error) {
 	wanted := key.Marshal()
 
-	for _, sshAlgorithmSigner := range *r.sshAlgorithmSigners {
+	for _, sshAlgorithmSigner := range r.sshAlgorithmSigners {
 		pubKeyBlob := sshAlgorithmSigner.Signer.PublicKey().Marshal()
 		if bytes.Equal(pubKeyBlob, wanted) {
 			if flags == 0 {
