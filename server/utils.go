@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -22,6 +23,7 @@ func GenerateRamdomBytes(length int) (value []byte, err error) {
 type AllowedKey struct {
 	Index       int
 	Key         ssh.PublicKey
+	ExpiresAt   time.Time
 	Comment     string
 	Principals  []string
 	ValidBefore uint64
@@ -36,6 +38,10 @@ func ParseAuthorizedKeys(lines []string) ([]AllowedKey, error) {
 	// http://man7.org/linux/man-pages/man8/sshd.8.html#AUTHORIZED_KEYS_FILE_FORMAT
 	// https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.certkeys
 	for i, line := range lines {
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
 		publicKey, comment, options, _, err := ssh.ParseAuthorizedKey([]byte(line))
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse line '%s': %v", line, err)
@@ -44,7 +50,8 @@ func ParseAuthorizedKeys(lines []string) ([]AllowedKey, error) {
 		key := AllowedKey{
 			Index:       i,
 			Key:         publicKey,
-			ValidBefore: ssh.CertTimeInfinity, // TODO: Set a better value  // uint64(time.Now().Add(time.Minute * 60).Unix()),
+			ExpiresAt:   time.Unix(1<<63-62135596801, 999999999), // MaxTime
+			ValidBefore: uint64(time.Now().Add(time.Minute * 60).Unix()),
 			Comment:     comment,
 			Principals:  []string{},
 			Options:     map[string]string{},
@@ -64,10 +71,16 @@ func ParseAuthorizedKeys(lines []string) ([]AllowedKey, error) {
 			case "agent-forwarding":
 				key.Extensions["permit-agent-forwarding"] = value
 			case "command":
-				// TODO: Don't allow empty commands
+				if value == "" {
+					return nil, fmt.Errorf("empty command not allowed")
+				}
 				key.Options["force-command"] = value
 			case "expiry-time":
-				// TODO: Use this to ignore key after date
+				expiresAt, err := time.Parse("2006010215040599", value)
+				if err != nil {
+					return nil, fmt.Errorf("expiry-time not valid format %s", value)
+				}
+				key.ExpiresAt = expiresAt
 			case "from":
 				// TODO: Convert wildcard matching to CIDR address/masklen notation
 				key.Options["source-address"] = value

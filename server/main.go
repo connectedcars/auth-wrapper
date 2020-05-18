@@ -85,13 +85,28 @@ func (s *SigningServer) VerifyCertificateRequest(certRequest *CertificateRequest
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Check if challenge expired
 
+	now := time.Now().UTC()
+
+	// Check if challenge expired
+	issueTimeStamp, err := time.Parse(time.RFC3339Nano, value.Timestamp)
+	if err != nil {
+		return nil, err
+	}
+	if issueTimeStamp.After(now.Add(30 * time.Second)) {
+		return nil, fmt.Errorf("challenge expired")
+	}
+
+	// Fetch key from allowed map
 	allowedKey := s.allowedKeysMap[certRequest.PublicKey]
 	if allowedKey == nil {
 		return nil, nil
 	}
-	// TODO: Check if allowedKey is expired?
+
+	// Disallowed if the key expired
+	if allowedKey.ExpiresAt.Before(now) {
+		return nil, fmt.Errorf("key expired")
+	}
 
 	payload := GenerateSigningPayload(certRequest)
 
@@ -149,7 +164,7 @@ func (s *SigningServer) GenerateChallenge() (challenge *Challenge, err error) {
 	}
 
 	jsonBytes, err := json.Marshal(&challengeValue{
-		Timestamp: time.Now().UTC().Format("2006-01-02T15:04:05.999Z"),
+		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
 		Random:    randomBytes,
 	})
 

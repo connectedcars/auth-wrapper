@@ -1,7 +1,5 @@
 package google
 
-// TODO: Move to google kms package instead
-
 import (
 	"context"
 	"crypto"

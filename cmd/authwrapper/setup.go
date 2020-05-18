@@ -39,7 +39,7 @@ func parseEnvironment() (*Config, error) {
 	config := &Config{
 		Command:                 os.Getenv("WRAP_COMMAND"),
 		Args:                    os.Args[1:],
-		RequestedPrincipals:     strings.Split(os.Getenv("PRINCIPALS"), ","),
+		RequestedPrincipals:     strings.Split(os.Getenv("SSH_PRINCIPALS"), ","),
 		SSHKeyPath:              os.Getenv("SSH_KEY_PATH"),
 		SSHKeyPassword:          os.Getenv("SSH_KEY_PASSWORD"),
 		SSHSigningServerURL:     os.Getenv("SSH_SIGNING_SERVER_URL"),
@@ -88,7 +88,12 @@ func parseEnvironment() (*Config, error) {
 		}
 	}
 
-	// TODO: Do more config error validation
+	if config.SSHSigningServerAddress != "" || config.SSHCaAuthorizedKeysPath != "" || config.SSHCaKeyPath != "" {
+		if config.SSHSigningServerAddress == "" || config.SSHCaAuthorizedKeysPath == "" || config.SSHCaKeyPath == "" {
+			return nil, fmt.Errorf("SSH_CA_KEY_PATH, SSH_CA_AUTHORIZED_KEYS_PATH, SSH_SIGNING_SERVER_LISTEN_ADDRESS needs to be provided")
+		}
+
+	}
 
 	if config.SSHSigningServerURL != "" && len(config.RequestedPrincipals) == 0 {
 		return nil, fmt.Errorf("When SSH_SIGNING_SERVER_URL is set a list of principals needs to be provided")
@@ -162,18 +167,24 @@ func setupKeyring(config *Config) (agent.ExtendedAgent, error) {
 	}
 
 	if config.SSHSigningServerURL != "" {
-		// TODO: Do something with the errors
 		var errors []error
 		for _, signer := range signers {
 			userCert, err := fetchUserCert(config.SSHSigningServerURL, signer.Signer, config.Command, config.Args, config.RequestedPrincipals)
 			if err != nil {
-				errors = append(errors, err)
+				errors = append(errors, fmt.Errorf("fetchUserCert for %s failed: %v", signer.Comment, err))
 				continue
 			}
 			certificates = append(certificates, sshagent.SSHCertificate{
 				Certificate: userCert,
-				Comment:     "key " + config.SSHKeyPath,
+				Comment:     "key " + signer.Comment,
 			})
+		}
+		if len(certificates) == 0 {
+			errStr := ""
+			for _, err := range errors {
+				errStr += err.Error()
+			}
+			return nil, fmt.Errorf("Failed to fetch a user cert:\n" + errStr)
 		}
 	}
 

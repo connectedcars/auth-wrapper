@@ -15,7 +15,6 @@ func main() {
 		log.Fatalf(": %v", err)
 	}
 
-	// TODO: Default to port if nothing has been set
 	if config.SSHCaKeyPath != "" && config.SSHSigningServerAddress != "" {
 		caPublickey, err := startSigningServer(
 			config.SSHCaKeyPath,
