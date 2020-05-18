@@ -28,6 +28,14 @@ func main() {
 		pubkeyString := strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(caPublickey)), "\n")
 		fmt.Fprintf(os.Stderr, "Starting signing server on %s with key:", config.SSHSigningServerAddress)
 		fmt.Fprintf(os.Stderr, "%s %s\n", pubkeyString, "ca "+config.SSHCaKeyPath)
+		if config.Command == "" {
+			// Wait until we get killed
+			select {}
+		}
+	}
+
+	if config.Command == "" {
+		log.Fatalf("auth-wrapper cmd args")
 	}
 
 	agent, err := setupKeyring(config)

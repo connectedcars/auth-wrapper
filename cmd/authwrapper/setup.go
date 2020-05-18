@@ -35,10 +35,11 @@ var principalsFlag = flag.String("principals", "", "requested principals")
 
 func parseEnvironment() (*Config, error) {
 	flag.Parse()
+	args := flag.Args()
 
 	config := &Config{
 		Command:                 os.Getenv("WRAP_COMMAND"),
-		Args:                    os.Args[1:],
+		Args:                    args,
 		RequestedPrincipals:     strings.Split(os.Getenv("SSH_PRINCIPALS"), ","),
 		SSHKeyPath:              os.Getenv("SSH_KEY_PATH"),
 		SSHKeyPassword:          os.Getenv("SSH_KEY_PASSWORD"),
@@ -79,12 +80,11 @@ func parseEnvironment() (*Config, error) {
 			os.Setenv("PATH", cleanedPath)
 
 			config.Command = processName
-		} else {
-			if len(os.Args) < 2 {
-				return nil, fmt.Errorf("auth-wrapper cmd args")
+		} else if len(config.Args) > 0 {
+			config.Command = args[0]
+			if len(config.Args) > 1 {
+				config.Args = args[1:]
 			}
-			config.Command = os.Args[1]
-			config.Args = os.Args[2:]
 		}
 	}
 
