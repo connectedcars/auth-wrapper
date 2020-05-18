@@ -1,50 +1,21 @@
 # Auth wrapper
 
-Simple wrapper that exposes an ssh-agent to all sub processes using keys from Google Cloud KMS or OpenSSH pem formated key.
+Command wrapper that exposes an ssh-agent to all sub processes with keys and ssh certs backed by Google Cloud KMS or local OpenSSH pem formatted keys.
 
-This can fx be used in CI/CD pipelines when checking code out, running package installers pulling code from private repos.
+This can be used in:
+
+* CI/CD pipelines when checking code out, running package installers pulling code from private repos.
+* Auditing and restricting access to distributed SSH servers in a central location
 
 ## How to use
+
+### Git checkout
 
 Git clone with key store in Google Cloud KMS:
 
 ``` bash
 export SSH_KEY_PATH=kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1
 auth-wrapper git clone git@github.com:connectedcars/private-module.git
-```
-
-Docker buildkit build with a key stored in Google Cloud KMS:
-
-``` bash
-export SSH_KEY_PATH=kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1
-export PROGRESS_NO_TRUNC=1
-export DOCKER_BUILDKIT=1
-# The strings $SSH_AUTH_SOCK and $$SSH_AUTH_SOCK will be replaced with socket in the arguments
-auth-wrapper docker --progress=plain --ssh=default='\$SSH_AUTH_SOCK' . # Note the escape to make sure we don't use the shells SSH_AUTH_SOCK
-```
-
-[Dockerfile](./testdata/Dockerfile)
-
-Google Cloud build with Docker buildkit build:
-
-``` yaml
-steps:
-  # Pull a modern version of docker
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'gcr.io/cloud-builders/docker:latest']
-  # Workaround for https://github.com/moby/moby/issues/39120
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'docker/dockerfile:experimental']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'docker/dockerfile:1.0-experimental']
-  # Build container injecting SSH agent socket
-  - name: 'gcr.io/$PROJECT_ID/auth-wrapper-docker.master:latest'
-    args: ['build', '--progress=plain', '--ssh=default=$$SSH_AUTH_SOCK', '-tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', '.']
-    env:
-      - "SSH_KEY_PATH=kms://projects/$PROJECT_ID/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/1"
-      - "PROGRESS_NO_TRUNC=1"
-      - "DOCKER_BUILDKIT=1"
-images: ['gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME']
 ```
 
 Git clone with local key:
@@ -55,33 +26,75 @@ export SSH_KEY_PASSWORD=thepassword
 auth-wrapper git clone git@github.com:connectedcars/private-module.git
 ```
 
+### SSH Certs
+
+Signing server:
+
+authorized_keys:
+
+``` text
+restrict,command="echo hello",from="192.168.1.0/24",principals="user1,serverType:*" ecdsa-sha2-nistp256 AAAA...(copy from output of client) user1@company.com
+restrict,principals="user2" ssh-rsa AAAA... user1@company.com
+```
+
+``` bash
+export SSH_SIGNING_SERVER_LISTEN_ADDRESS=":3080"
+export SSH_CA_KEY_PATH="kms://projects/yourprojectname/locations/global/keyRings/ssh-keys/cryptoKeys/ssh-key/cryptoKeyVersions/1"
+export SSH_CA_AUTHORIZED_KEYS_PATH="authorized_keys"
+auth-wrapper
+```
+
+Client:
+
+``` bash
+export SSH_KEY_PATH=kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1
+export SSH_SIGNING_SERVER_URL="http://localhost:3080"
+auth-wrapper -p user1 ssh 1.2.3.4
+auth-wrapper -p serverType:gw ssh 1.2.3.4 # Use wildcard match
+```
+
+SSH Server:
+
+~/.ssh/authorized_keys:
+
+``` text
+cert-authority,principals="user1,serverType:gw" ssh-rsa AAAA...(copy from output of signing server) ca key
+```
+
 ## Options
 
-Environment variables:
+### Arguments
+
+* -principals : Principals to request
+
+### Environment variables
+
+Client options:
 
 * SSH_KEY_PATH: Path to SSH key, can be OpenSSH PEM formated key or a url to KMS key
 * SSH_KEY_PASSWORD: Password to key, only used by PEM formated key
 * WRAP_COMMAND: Command to run with the arguments to auth-wrapper
+* SSH_SIGNING_SERVER_URL: Url for the signing server
+* SSH_PRINCIPALS: Principals to request
+
+Signing server options:
+
+* SSH_SIGNING_SERVER_LISTEN_ADDRESS: Listen address in the following format ":8080"
+* SSH_CA_KEY_PATH: Path to CA signing key, only KMS keys supported at the moment and limited to "Elliptic Curve P-256 key
+SHA256 Digest"
+* SSH_CA_AUTHORIZED_KEYS_PATH": Path to authorized_keys following [AUTHORIZED_KEYS_FILE_FORMAT](http://man7.org/linux/man-pages/man8/sshd.8.html#AUTHORIZED_KEYS_FILE_FORMAT)
 
 ## Google Cloud KMS key setup
 
 Create keyring and key:
 
 ``` bash
-# Create keyring for cloud build keys
-gcloud kms keyrings create --location global cloudbuild
+# Create keyring
+gcloud kms keyrings create --location global ssh-keys
 # It needs to be be SHA512 as the ssh client seems to default to this hashing algorithm and KMS pairs key size and hashing algorithms for some reason.
-gcloud kms keys create ssh-key --keyring cloudbuilder --location global --default-algorithm rsa-sign-pkcs1-4096-sha512 --purpose asymmetric-signing
+gcloud kms keys create ssh-key --keyring ssh-keys --location global --default-algorithm rsa-sign-pkcs1-4096-sha512 --purpose asymmetric-signing
 # Give cloud build access to use the key
-gcloud kms keys add-iam-policy-binding ssh-key --keyring=cloudbuilder --location=global --member serviceAccount:projectserviceaccount@cloudbuild.gserviceaccount.com --role roles/cloudkms.signerVerifier
-```
-
-Extract public key and convert to ssh format:
-
-``` bash
-gcloud kms keys versions get-public-key 1 --key ssh-key --keyring=cloudbuilder --location=global > ssh-key.pem
-# Copy the output to a github user
-ssh-keygen -f ssh-key.pem -i -mPKCS8
+gcloud kms keys add-iam-policy-binding ssh-key --keyring=ssh-keys --location=global --member user@company.com --role roles/cloudkms.signerVerifier
 ```
 
 ## Local key
