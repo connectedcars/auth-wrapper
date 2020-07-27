@@ -194,7 +194,7 @@ func setupKeyring(config *Config) (agent.ExtendedAgent, error) {
 func fetchUserCert(signingServerURL string, signer ssh.AlgorithmSigner, command string, args []string, principals []string) (*ssh.Certificate, error) {
 	// GET /certificate/challenge # { value: "{ \"timestamp\": \"2020-01-01T10:00:00.000Z\" \"random\": \"...\"}", signature: "signed by CA key" }
 	var challenge server.Challenge
-	err := httpJSONRequest("GET", signingServerURL+"/certificate/challenge", nil, &challenge)
+	err := httpJSONRequest("GET", signingServerURL+"/certificate/challenge", nil, &challenge, 1*1024*1024)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func fetchUserCert(signingServerURL string, signer ssh.AlgorithmSigner, command 
 
 	// get back { certificate: "base64 encoded cert" }
 	var certResponse server.CertificateResponse
-	err = httpJSONRequest("POST", signingServerURL+"/certificate", certRequest, &certResponse)
+	err = httpJSONRequest("POST", signingServerURL+"/certificate", certRequest, &certResponse, 1*1024*1024)
 	if err != nil {
 		return nil, err
 	}

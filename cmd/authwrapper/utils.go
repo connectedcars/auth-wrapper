@@ -101,7 +101,7 @@ func runCommand(command string, args []string) (exitCode int, err error) {
 	return 0, nil
 }
 
-func httpJSONRequest(method string, url string, requestData interface{}, responseData interface{}) error {
+func httpJSONRequest(method string, url string, requestData interface{}, responseData interface{}, maxResponseSize int64) error {
 	// Convert request to JSON and wrap in io.Reader
 	var requestBody io.Reader
 	if requestData != nil {
@@ -122,7 +122,10 @@ func httpJSONRequest(method string, url string, requestData interface{}, respons
 		return err
 	}
 	defer httpResponse.Body.Close()
-	responseBody, err := ioutil.ReadAll(httpResponse.Body)
+
+	// Limit size of response body we read into memory
+	limitedReader := &io.LimitedReader{R: httpResponse.Body, N: maxResponseSize}
+	responseBody, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -72,7 +73,11 @@ func (s *HTTPSigningServer) getCertificateChallenge(w http.ResponseWriter, r *ht
 
 func (s *HTTPSigningServer) postCertificate(w http.ResponseWriter, r *http.Request) (jsonResponse interface{}, statusError *StatusError) {
 	defer r.Body.Close()
-	body, err := ioutil.ReadAll(r.Body)
+
+	// Limit how much of the body we read in a request
+	limitedReader := &io.LimitedReader{R: r.Body, N: 1 * 1024 * 1024}
+
+	body, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, &StatusError{500, err}
 	}
