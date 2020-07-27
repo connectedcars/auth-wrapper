@@ -2,6 +2,15 @@ steps:
   #
   # Build KMS auth wrappers
   #
+  # Build auth wrapped server container
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--target=main',
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', 
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest', 
+      '.'
+      ]
   # Build auth wrapped git
   - name: 'gcr.io/cloud-builders/docker'
     args: [
@@ -49,6 +58,7 @@ secrets:
   secretEnv:
     SSH_KEY_PASSWORD: CiQAg7wCPfO2Tf9mtZoFWjAtX7whQ481af3gyGdM9WNK26B74UkSUQBefMgeHNh0KTsGybKReXDsFcbmed7f5sw97zSe9cswpKogENM5Ye0jiIu6NfebUpCnmJ9HVHmD/yBknlW4nn1VXBs7HYGiBSFZ52i2HyEopw==
 images: [
+  'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME',
   'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME',
   'gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME'
 ]

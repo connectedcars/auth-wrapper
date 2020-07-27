@@ -20,6 +20,22 @@ ENV GO111MODULE=on
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.versionString=$VERSION'" ./cmd/authwrapper
 
+RUN echo nobody:x:65534:65534:nobody:/: > password.minimal
+
+#
+# Auth-wrapper server image
+#
+FROM scratch as main
+
+ARG SSH_KEY_PATH
+
+COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
+COPY --from=builder /app/password.minimal /etc/password
+
+USER nobody
+
+ENTRYPOINT ["/opt/bin/auth-wrapper"]
+
 #
 # Authwrapped git with KMS keys
 #

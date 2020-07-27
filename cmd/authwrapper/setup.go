@@ -94,7 +94,6 @@ func parseEnvironment() (*Config, error) {
 		if config.SSHSigningServerAddress == "" || config.SSHCaAuthorizedKeysPath == "" || config.SSHCaKeyPath == "" {
 			return nil, fmt.Errorf("SSH_CA_KEY_PATH, SSH_CA_AUTHORIZED_KEYS_PATH, SSH_SIGNING_SERVER_LISTEN_ADDRESS needs to be provided")
 		}
-
 	}
 
 	if config.SSHSigningServerURL != "" && len(config.RequestedPrincipals) == 0 {
