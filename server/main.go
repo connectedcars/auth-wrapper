@@ -127,7 +127,7 @@ func (s *SigningServer) IssueUserCertificate(allowedKey *AllowedKey, principals 
 		CertType:        ssh.UserCert,
 		ValidPrincipals: principals,
 		ValidAfter:      0,
-		ValidBefore:     allowedKey.ValidBefore,
+		ValidBefore:     uint64(time.Now().Add(allowedKey.Lifetime).Unix()),
 		Permissions: ssh.Permissions{
 			CriticalOptions: allowedKey.Options,
 			Extensions:      allowedKey.Extensions,

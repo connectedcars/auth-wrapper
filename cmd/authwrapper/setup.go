@@ -24,6 +24,7 @@ type Config struct {
 	SSHKeyPath              string
 	SSHKeyPassword          string
 	SSHSigningServerURL     string
+	SSHSigningLifetime      string
 	SSHCaKeyPath            string
 	SSHCaKeyPassword        string
 	SSHCaAuthorizedKeysPath string
@@ -44,6 +45,7 @@ func parseEnvironment() (*Config, error) {
 		SSHKeyPath:              os.Getenv("SSH_KEY_PATH"),
 		SSHKeyPassword:          os.Getenv("SSH_KEY_PASSWORD"),
 		SSHSigningServerURL:     os.Getenv("SSH_SIGNING_SERVER_URL"),
+		SSHSigningLifetime:      os.Getenv("SSH_SIGNING_LIFETIME"),
 		SSHCaKeyPath:            os.Getenv("SSH_CA_KEY_PATH"),
 		SSHCaKeyPassword:        os.Getenv("SSH_CA_KEY_PASSWORD"),
 		SSHCaAuthorizedKeysPath: os.Getenv("SSH_CA_AUTHORIZED_KEYS_PATH"),

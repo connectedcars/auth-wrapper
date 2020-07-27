@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -15,12 +16,19 @@ func main() {
 		log.Fatalf(": %v", err)
 	}
 
-	if config.SSHCaKeyPath != "" && config.SSHSigningServerAddress != "" {
+	if config.SSHCaKeyPath != "" && config.SSHCaAuthorizedKeysPath != "" && config.SSHSigningServerAddress != "" {
+		var lifetime time.Duration = time.Hour * 1
+		if config.SSHSigningLifetime != "" {
+			lifetime, err = time.ParseDuration(config.SSHSigningLifetime)
+			log.Fatalf(": %v", err)
+		}
+
 		caPublickey, err := startSigningServer(
 			config.SSHCaKeyPath,
 			config.SSHCaKeyPassword,
 			config.SSHCaAuthorizedKeysPath,
 			config.SSHSigningServerAddress,
+			lifetime,
 		)
 		if err != nil {
 			log.Fatalf("createSigningServer: %v", err)

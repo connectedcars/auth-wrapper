@@ -40,7 +40,7 @@ func runCommandWithSSHAgent(agent agent.ExtendedAgent, command string, args []st
 	return runCommand(command, args)
 }
 
-func startSigningServer(caPrivateKeyPath string, keyPassword string, authorizedKeysPath, address string) (ssh.PublicKey, error) {
+func startSigningServer(caPrivateKeyPath string, keyPassword string, authorizedKeysPath, address string, defaultLifetime time.Duration) (ssh.PublicKey, error) {
 	var caPublicKey ssh.PublicKey
 	if strings.HasPrefix(caPrivateKeyPath, "kms://") {
 		var err error
@@ -61,7 +61,7 @@ func startSigningServer(caPrivateKeyPath string, keyPassword string, authorizedK
 			return nil, fmt.Errorf("failed readLines: %v", err)
 		}
 
-		allowedKeys, err := server.ParseAuthorizedKeys(authorizedKeysLines)
+		allowedKeys, err := server.ParseAuthorizedKeys(authorizedKeysLines, defaultLifetime)
 		if err != nil {
 			return nil, fmt.Errorf("failed parse ParseAuthorizedKeys: %v", err)
 		}

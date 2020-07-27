@@ -21,18 +21,18 @@ func GenerateRamdomBytes(length int) (value []byte, err error) {
 
 // AllowedKey contains the allowed values for this key
 type AllowedKey struct {
-	Index       int
-	Key         ssh.PublicKey
-	ExpiresAt   time.Time
-	Comment     string
-	Principals  []string
-	ValidBefore uint64
-	Options     map[string]string
-	Extensions  map[string]string
+	Index      int
+	Key        ssh.PublicKey
+	ExpiresAt  time.Time
+	Lifetime   time.Duration
+	Comment    string
+	Principals []string
+	Options    map[string]string
+	Extensions map[string]string
 }
 
 // ParseAuthorizedKeys to []AllowedCertKey format
-func ParseAuthorizedKeys(lines []string) ([]AllowedKey, error) {
+func ParseAuthorizedKeys(lines []string, defaultLifetime time.Duration) ([]AllowedKey, error) {
 	keys := []AllowedKey{}
 
 	// http://man7.org/linux/man-pages/man8/sshd.8.html#AUTHORIZED_KEYS_FILE_FORMAT
@@ -48,14 +48,14 @@ func ParseAuthorizedKeys(lines []string) ([]AllowedKey, error) {
 		}
 
 		key := AllowedKey{
-			Index:       i,
-			Key:         publicKey,
-			ExpiresAt:   time.Unix(1<<63-62135596801, 999999999), // MaxTime
-			ValidBefore: uint64(time.Now().Add(time.Minute * 60).Unix()),
-			Comment:     comment,
-			Principals:  []string{},
-			Options:     map[string]string{},
-			Extensions:  map[string]string{},
+			Index:      i,
+			Key:        publicKey,
+			ExpiresAt:  time.Unix(1<<63-62135596801, 999999999), // MaxTime
+			Lifetime:   defaultLifetime,                         // TODO: Add this as option or encode it in the comment field
+			Comment:    comment,
+			Principals: []string{},
+			Options:    map[string]string{},
+			Extensions: map[string]string{},
 		}
 
 		restricted := false
