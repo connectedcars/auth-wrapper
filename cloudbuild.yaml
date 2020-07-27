@@ -1,65 +1,32 @@
 steps:
-  # Pull a modern version of docker
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'gcr.io/cloud-builders/docker:latest']
-  # Workaround for https://github.com/moby/moby/issues/39120
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'docker/dockerfile:experimental']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'docker/dockerfile:1.0-experimental']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'docker.io/docker/dockerfile-copy:v0.1.9']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['pull', 'ubuntu:19.10']
-  # Check version
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['version']
   #
   # Build KMS auth wrappers
   #
-  # TODO: Move to own Dockerfile's, this is getting a bit too fancy
+  # Build auth wrapped server container
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--target=main',
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', 
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest', 
+      '.'
+      ]
   # Build auth wrapped git
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
-      '--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/git',
-      '--build-arg=WRAP_COMMAND=/usr/bin/git',
-      '--build-arg=WRAP_NAME=git',
+      '--target=git-kms',
       '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:latest', 
       '.'
       ]
-  # Build auth wrapped docker
-  - name: 'gcr.io/cloud-builders/docker'
-    args: [
-      'build',
-      '--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/docker',
-      '--build-arg=WRAP_COMMAND=/usr/bin/docker',
-      '--build-arg=WRAP_NAME=docker',
-      '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
-      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
-      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:latest', 
-      '.'
-      ]
-  # Test auth wrapped docker using KSM key
-  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA'
-    args: [
-      'build',
-      '--no-cache',
-      '--progress=plain',
-      '--ssh=default=$$SSH_AUTH_SOCK',
-      #'--network=host',
-      #'--add-host=metadata.google.internal:127.0.0.1',
-      '.'
-      ]
-    dir: 'testdata'
-    env:
-      - "PROGRESS_NO_TRUNC=1"
-      - "DOCKER_BUILDKIT=1"
   # Test auth wrapped git using KSM key
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA'
     args: ['clone', 'git@github.com:connectedcars/private-module.git']
+  - name: 'gcr.io/cloud-builders/git'
+    entrypoint: 'bash'
+    args: ['-c', 'rm -rf private-module']
   #
   # Build embedded key auth wrappers
   #
@@ -68,40 +35,30 @@ steps:
     args: [
             'cp',
             'gs://connectedcars-staging-cloudbuilder-private/build.pem',
-            './localkey'
+            './build.pem'
           ]
-  # Build auth wrapper docker image
+  # Build auth wrapper git image
   - name: 'gcr.io/cloud-builders/docker'
-    dir: localkey
     args: [
       'build', 
-      '--build-arg=FROM_IMAGE=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
-      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME:$COMMIT_SHA', 
-      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME:latest', '.'
+      '--target=git-local',
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME:$COMMIT_SHA', 
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME:latest', '.'
       ]
-  # Test cloud build wrapper using ssh key embedded in the container
-  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME:$COMMIT_SHA'
-    args: [
-      'build',
-      '--no-cache',
-      '--progress=plain',
-      '--ssh=default=$$SSH_AUTH_SOCK',
-      #'--network=host',
-      #'--add-host=metadata.google.internal:127.0.0.1',
-      '.'
-      ]
-    dir: 'testdata'
+  # Test auth wrapped git using local key
+  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA'
+    args: ['clone', 'git@github.com:connectedcars/private-module.git']
     secretEnv:
       - 'SSH_KEY_PASSWORD'
-    env:
-      - "PROGRESS_NO_TRUNC=1"
-      - "DOCKER_BUILDKIT=1"
+  - name: 'gcr.io/cloud-builders/git'
+    entrypoint: 'bash'
+    args: ['-c', 'rm -rf private-module']
 secrets:
 - kmsKeyName: projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/connectedcars-builder
   secretEnv:
     SSH_KEY_PASSWORD: CiQAg7wCPfO2Tf9mtZoFWjAtX7whQ481af3gyGdM9WNK26B74UkSUQBefMgeHNh0KTsGybKReXDsFcbmed7f5sw97zSe9cswpKogENM5Ye0jiIu6NfebUpCnmJ9HVHmD/yBknlW4nn1VXBs7HYGiBSFZ52i2HyEopw==
 images: [
+  'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME',
   'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME',
-  'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME',
-  'gcr.io/$PROJECT_ID/$REPO_NAME-docker-pemkey.$BRANCH_NAME'
+  'gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME'
 ]

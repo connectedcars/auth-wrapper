@@ -1,6 +1,7 @@
 package sshagent
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -43,6 +44,15 @@ func StartSSHAgentServer(sshAgent agent.Agent) (sshAuthSock string, error error)
 	}()
 
 	return sshAuthSock, err
+}
+
+// ConnectSSHAgent connects to a SSH agent socket and returns a agent.ExtendedAgent
+func ConnectSSHAgent(socket string) (agent.ExtendedAgent, error) {
+	conn, err := net.Dial("unix", string(socket))
+	if err != nil {
+		return nil, fmt.Errorf("net.Dial: %v", err)
+	}
+	return agent.NewClient(conn), nil
 }
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"

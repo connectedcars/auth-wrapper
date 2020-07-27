@@ -18,25 +18,56 @@ RUN go version
 
 ENV GO111MODULE=on
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.versionString=$VERSION'" ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -o auth-wrapper -ldflags "-X 'main.versionString=$VERSION'" ./cmd/authwrapper
 
-# Production image
-FROM ${WRAP_IMAGE} as production
+RUN echo nobody:x:65534:65534:nobody:/: > password.minimal
 
-ARG WRAP_COMMAND
-ARG WRAP_NAME
+#
+# Auth-wrapper server image
+#
+FROM scratch as main
+
 ARG SSH_KEY_PATH
 
 COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
-RUN ln -s /opt/bin/auth-wrapper /opt/bin/${WRAP_NAME}
+COPY --from=builder /app/password.minimal /etc/password
 
-# Used by git image
+USER nobody
+
+ENTRYPOINT ["/opt/bin/auth-wrapper"]
+
+#
+# Authwrapped git with KMS keys
+#
+FROM gcr.io/cloud-builders/git as git-kms
+
+ARG SSH_KEY_PATH
+
+COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
+RUN ln -s /opt/bin/auth-wrapper /opt/bin/git
+
 ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
-# Force google tools to use the DNS name so we can overwrite it in docker
-ENV GCE_METADATA_HOST=metadata.google.internal
+ENV PATH=/opt/bin:${PATH}
+ENV WRAP_COMMAND=git
+ENV SSH_KEY_PATH=${SSH_KEY_PATH}
+ENTRYPOINT ["/opt/bin/auth-wrapper"]
+
+
+#
+# Authwrapped git with local keys
+#
+FROM gcr.io/cloud-builders/git as git-local
+
+COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
+RUN ln -s /opt/bin/auth-wrapper /opt/bin/git
+
+COPY build.pem /
+RUN chmod 600 /build.pem
+
+ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
 ENV PATH=/opt/bin:${PATH}
-ENV WRAP_COMMAND=${WRAP_COMMAND}
-ENV SSH_KEY_PATH=${SSH_KEY_PATH}
+ENV WRAP_COMMAND=git
+ENV SSH_KEY_PATH=/build.pem
 ENTRYPOINT ["/opt/bin/auth-wrapper"]

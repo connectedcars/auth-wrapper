@@ -13,3 +13,5 @@
 .vscode
 /auth-wrapper
 vendor
+/dist
+authorized_keys
