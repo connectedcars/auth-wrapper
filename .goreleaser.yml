@@ -10,7 +10,7 @@ before:
     - go generate ./...
 builds:
 -
-  main: ./cmd/authwrapper/main.go
+  main: ./cmd/authwrapper
   goarch:
     - amd64
   env:
