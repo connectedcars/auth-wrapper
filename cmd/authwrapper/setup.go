@@ -170,6 +170,7 @@ func setupKeyring(config *Config) (agent.ExtendedAgent, error) {
 
 	if config.SSHSigningServerURL != "" {
 		var errors []error
+		// TODO: support fetching new certs when they expire
 		for _, signer := range signers {
 			userCert, err := fetchUserCert(config.SSHSigningServerURL, signer.Signer, config.Command, config.Args, config.RequestedPrincipals)
 			if err != nil {

@@ -70,6 +70,8 @@ func (r *sshAlgorithmSignerKeyring) List() ([]*agent.Key, error) {
 	// TODO: the go lang ssh cert implementation does not support forcing rsa-sha2-256-cert-v01@openssh.com or rsa-sha2-512-cert-v01@openssh.com
 	// https://cvsweb.openbsd.org/src/usr.bin/ssh/PROTOCOL.certkeys?annotate=HEAD
 	// To fix this we would need to replace the keyname in the certBlob with one of the names listed.
+	// This seems to be fixed in a newer go version, when this is merged:
+	// https://github.com/golang/go/issues/37278
 	for _, certificate := range r.sshCertificates {
 		keys = append(keys, &agent.Key{
 			Format:  certificate.Certificate.Type(),

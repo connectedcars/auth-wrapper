@@ -59,6 +59,7 @@ type SigningServer struct {
 // NewSigningServer creates a new server
 func NewSigningServer(caKey ssh.Signer, allowedKeys []AllowedKey) *SigningServer {
 	var allowedKeysMap = map[string]*AllowedKey{}
+
 	for i, allowedKey := range allowedKeys {
 		pubkeyString := strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(allowedKey.Key)), "\n")
 		allowedKeysMap[pubkeyString] = &allowedKeys[i]
