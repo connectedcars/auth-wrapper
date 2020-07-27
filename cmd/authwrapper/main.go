@@ -20,7 +20,9 @@ func main() {
 		var lifetime time.Duration = time.Hour * 1
 		if config.SSHSigningLifetime != "" {
 			lifetime, err = time.ParseDuration(config.SSHSigningLifetime)
-			log.Fatalf(": %v", err)
+			if err != nil {
+				log.Fatalf(": %v", err)
+			}
 		}
 
 		caPublickey, err := startSigningServer(
