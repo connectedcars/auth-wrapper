@@ -37,6 +37,8 @@ func ParseAuthorizedKeys(lines []string, defaultLifetime time.Duration) ([]Allow
 
 	// http://man7.org/linux/man-pages/man8/sshd.8.html#AUTHORIZED_KEYS_FILE_FORMAT
 	// https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.certkeys
+
+	seenKeys := make(map[string]bool)
 	for i, line := range lines {
 		if strings.HasPrefix(line, "#") {
 			continue
@@ -46,6 +48,13 @@ func ParseAuthorizedKeys(lines []string, defaultLifetime time.Duration) ([]Allow
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse line '%s': %v", line, err)
 		}
+
+		// Return error if there are duplicates
+		strPublicKey := string(ssh.MarshalAuthorizedKey(publicKey))
+		if seenKeys[strPublicKey] {
+			return nil, fmt.Errorf("public key is listed more than once '%s': %v", line, err)
+		}
+		seenKeys[strPublicKey] = true
 
 		key := AllowedKey{
 			Index:      i,
