@@ -30,21 +30,34 @@ auth-wrapper git clone git@github.com:connectedcars/private-module.git
 
 Signing server:
 
+The signing server issues a certificate based on an allow list in authorized keys file format:
+
+http://man7.org/linux/man-pages/man8/sshd.8.html#AUTHORIZED_KEYS_FILE_FORMAT
+
+Example file:
+
 authorized_keys:
 
 ``` text
-restrict,command="echo hello",from="192.168.1.0/24",principals="user1,serverType:*" ecdsa-sha2-nistp256 AAAA...(copy from output of client) user1@company.com
-restrict,principals="user2" ssh-rsa AAAA... user1@company.com
+# Only allow this public key access from 192.168.1.0/24 and to run command "echo hello" with principal name "user1,serverType"
+restrict,command="echo hello",from="192.168.1.0/24",principals="user1,serverType" ecdsa-sha2-nistp256 AAAA...C (copy from output of client) user1@company.com
+# Only allow this public key access with principal name "user2"
+restrict,principals="user2" ssh-rsa AAAA...D(copy from output of client) user2@company.com
+# Only allow sftp access with principal name "user3"
+restrict,principals="user3",command=internal-sftp AAAA...E (copy from output of client) user3@company.com
 ```
+
+Starting the server:
 
 ``` bash
 export SSH_SIGNING_SERVER_LISTEN_ADDRESS=":3080"
 export SSH_CA_KEY_PATH="kms://projects/yourprojectname/locations/global/keyRings/ssh-keys/cryptoKeys/ssh-key/cryptoKeyVersions/1"
 export SSH_CA_AUTHORIZED_KEYS_PATH="authorized_keys"
+export SSH_SIGNING_LIFETIME="60m"
 auth-wrapper
 ```
 
-Client:
+Using the client:
 
 ``` bash
 export SSH_KEY_PATH=kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1
@@ -54,6 +67,8 @@ auth-wrapper -p serverType:gw ssh 1.2.3.4 # Use wildcard match
 ```
 
 SSH Server:
+
+To configure a SSH server to trust the signing server CA for a specific user:
 
 ~/.ssh/authorized_keys:
 
