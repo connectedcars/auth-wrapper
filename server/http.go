@@ -88,7 +88,7 @@ func (s *HTTPSigningServer) postCertificate(w http.ResponseWriter, r *http.Reque
 		return nil, &StatusError{400, err}
 	}
 
-	// Validate input
+	// Validate CertificateRequest input
 	if certRequest.Challenge == nil {
 		return nil, &StatusError{400, fmt.Errorf("challenge not set")}
 	}
@@ -97,6 +97,17 @@ func (s *HTTPSigningServer) postCertificate(w http.ResponseWriter, r *http.Reque
 	}
 	if certRequest.Signature == nil {
 		return nil, &StatusError{400, fmt.Errorf("signature not set")}
+	}
+	if certRequest.Args == nil {
+		return nil, &StatusError{400, fmt.Errorf("args not set")}
+	}
+
+	// Validate certRequest.Challenge
+	if certRequest.Challenge.Signature == nil {
+		return nil, &StatusError{400, fmt.Errorf("challenge.signature not set")}
+	}
+	if certRequest.Challenge.Value == nil {
+		return nil, &StatusError{400, fmt.Errorf("challenge.value not set")}
 	}
 
 	// Check if this request is allowed
