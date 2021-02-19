@@ -1,4 +1,7 @@
 steps:
+  # List docker version
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['version']  
   #
   # Build KMS auth wrappers
   #
