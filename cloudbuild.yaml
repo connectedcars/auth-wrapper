@@ -2,6 +2,11 @@ steps:
   # List docker version
   - name: 'gcr.io/cloud-builders/docker'
     args: ['version']  
+  # Workaround for https://github.com/moby/moby/issues/39120
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker/dockerfile:experimental']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker/dockerfile:1.0-experimental']
   #
   # Build KMS auth wrappers
   #
