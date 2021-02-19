@@ -55,6 +55,24 @@ ENTRYPOINT ["/opt/bin/auth-wrapper"]
 
 
 #
+# Authwrapped docker with KMS keys
+#
+FROM gcr.io/cloud-builders/docker as docker-kms
+
+ARG SSH_KEY_PATH
+
+COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
+RUN ln -s /opt/bin/auth-wrapper /opt/bin/docker
+
+ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
+ENV PATH=/opt/bin:${PATH}
+ENV WRAP_COMMAND=docker
+ENV SSH_KEY_PATH=${SSH_KEY_PATH}
+ENV DOCKER_BUILDKIT=1
+ENTRYPOINT ["/opt/bin/auth-wrapper"]
+
+#
 # Authwrapped git with local keys
 #
 FROM gcr.io/cloud-builders/git as git-local

@@ -14,7 +14,9 @@ steps:
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest', 
       '.'
       ]
+  #
   # Build auth wrapped git
+  #
   - name: 'gcr.io/cloud-builders/docker'
     args: [
       'build',
@@ -30,6 +32,21 @@ steps:
   - name: 'gcr.io/cloud-builders/git'
     entrypoint: 'bash'
     args: ['-c', 'rm -rf private-module']
+  #
+  # Build auth wrapped docker
+  #
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--target=docker-kms',
+      '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:latest', 
+      '.'
+      ]
+  # Test auth wrapped docker using KSM key
+  - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA'
+    args: ['build', '--progress=plain', '--ssh', 'default', 'resources/docker-kms-test']
   #
   # Build embedded key auth wrappers
   #
