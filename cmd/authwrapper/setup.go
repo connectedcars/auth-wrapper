@@ -30,7 +30,7 @@ type Config struct {
 	SSHCaAuthorizedKeysPath string
 	SSHSigningServerAddress string
 	SSHAgentSocket          string
-	AuthWrapperQuiet        string
+	AuthWrapperQuiet        bool
 }
 
 var principalsFlag = flag.String("principals", "", "requested principals")
@@ -38,6 +38,8 @@ var principalsFlag = flag.String("principals", "", "requested principals")
 func parseEnvironment() (*Config, error) {
 	flag.Parse()
 	args := flag.Args()
+
+	_, isAuthWrapperQuiet := os.LookupEnv("AUTH_WRAPPER_QUIET")
 
 	config := &Config{
 		Command:                 os.Getenv("WRAP_COMMAND"),
@@ -52,7 +54,7 @@ func parseEnvironment() (*Config, error) {
 		SSHCaAuthorizedKeysPath: os.Getenv("SSH_CA_AUTHORIZED_KEYS_PATH"),
 		SSHSigningServerAddress: os.Getenv("SSH_SIGNING_SERVER_LISTEN_ADDRESS"),
 		SSHAgentSocket:          os.Getenv("SSH_AUTH_SOCK"),
-		AuthWrapperQuiet:        os.Getenv("AUTH_WRAPPER_QUIET"),
+		AuthWrapperQuiet:        isAuthWrapperQuiet,
 	}
 	os.Unsetenv("WRAP_COMMAND")
 	os.Unsetenv("SSH_KEY_PATH")

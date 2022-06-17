@@ -29,7 +29,15 @@ func runCommandWithSSHAgent(agent agent.ExtendedAgent, command string, args []st
 	if err != nil {
 		return 255, fmt.Errorf("Failed to start ssh agent server: %v", err)
 	}
-	os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
+
+	// Hide this behind quiet until the Go standard library has support for the new "agentc" extension in Open-SSH
+	config, err := parseEnvironment()
+	if err != nil {
+		log.Fatalf(": %v", err)
+	}
+	if config.AuthWrapperQuiet == false {
+		os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
+	}
 
 	// Do string replacement for SSH_AUTH_SOCK
 	for i, arg := range args {

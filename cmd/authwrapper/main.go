@@ -59,7 +59,7 @@ func main() {
 		log.Fatalf("Failed to list sshAgent keys: %v", err)
 	}
 
-	if config.AuthWrapperQuiet == "" {
+	if config.AuthWrapperQuiet == false {
 		fmt.Fprintf(os.Stderr, "Loaded keys:\n")
 
 		for _, key := range keyList {
@@ -72,7 +72,7 @@ func main() {
 		log.Fatalf("runCommandWithSSHAgent: %v", err)
 	}
 
-	if config.AuthWrapperQuiet == "" {
+	if config.AuthWrapperQuiet == false {
 		fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
 	}
 }
