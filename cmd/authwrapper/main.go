@@ -75,4 +75,5 @@ func main() {
 	if config.AuthWrapperQuiet == false {
 		fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
 	}
+	os.Exit(exitCode)
 }

@@ -39,6 +39,7 @@ func parseEnvironment() (*Config, error) {
 	flag.Parse()
 	args := flag.Args()
 
+	// TODO: Do a proper check here (AUTH_WRAPPER_QUIET=false still is true)
 	_, isAuthWrapperQuiet := os.LookupEnv("AUTH_WRAPPER_QUIET")
 
 	config := &Config{
