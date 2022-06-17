@@ -24,16 +24,13 @@ import (
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
-func runCommandWithSSHAgent(agent agent.ExtendedAgent, command string, args []string, isQuiet bool) (exitCode int, err error) {
+func runCommandWithSSHAgent(agent agent.ExtendedAgent, command string, args []string) (exitCode int, err error) {
 	sshAuthSock, err := sshagent.StartSSHAgentServer(agent)
 	if err != nil {
 		return 255, fmt.Errorf("Failed to start ssh agent server: %v", err)
 	}
 
-	// Hide this behind quiet until the Go standard library has support for the new "agentc" extension in Open-SSH
-	if isQuiet == false {
-		os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
-	}
+	os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
 
 	// Do string replacement for SSH_AUTH_SOCK
 	for i, arg := range args {
