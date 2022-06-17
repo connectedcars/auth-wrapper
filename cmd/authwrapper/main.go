@@ -67,7 +67,7 @@ func main() {
 		}
 	}
 
-	exitCode, err := runCommandWithSSHAgent(agent, config.Command, config.Args)
+	exitCode, err := runCommandWithSSHAgent(agent, config.Command, config.Args, config.AuthWrapperQuiet)
 	if err != nil {
 		log.Fatalf("runCommandWithSSHAgent: %v", err)
 	}
