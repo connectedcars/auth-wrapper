@@ -76,6 +76,14 @@ To configure a SSH server to trust the signing server CA for a specific user:
 cert-authority,principals="user1,serverType:gw" ssh-rsa AAAA...(copy from output of signing server) ca key
 ```
 
+
+## Use Examples
+```
+auth-wrapper ssh user@ip
+auth-wrapper ssh user@ip 'echo hello'
+```
+
+
 ## Options
 
 ### Arguments
