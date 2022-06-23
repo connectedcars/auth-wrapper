@@ -29,6 +29,7 @@ func runCommandWithSSHAgent(agent agent.ExtendedAgent, command string, args []st
 	if err != nil {
 		return 255, fmt.Errorf("Failed to start ssh agent server: %v", err)
 	}
+
 	os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
 
 	// Do string replacement for SSH_AUTH_SOCK

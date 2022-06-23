@@ -58,9 +58,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to list sshAgent keys: %v", err)
 	}
-	fmt.Fprintf(os.Stderr, "Loaded keys:\n")
-	for _, key := range keyList {
-		fmt.Fprintf(os.Stderr, "%s %s\n", strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(key)), "\n"), key.Comment)
+
+	if config.AuthWrapperQuiet == false {
+		fmt.Fprintf(os.Stderr, "Loaded keys:\n")
+
+		for _, key := range keyList {
+			fmt.Fprintf(os.Stderr, "%s %s\n", strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(key)), "\n"), key.Comment)
+		}
 	}
 
 	exitCode, err := runCommandWithSSHAgent(agent, config.Command, config.Args)
@@ -68,6 +72,8 @@ func main() {
 		log.Fatalf("runCommandWithSSHAgent: %v", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
+	if config.AuthWrapperQuiet == false {
+		fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
+	}
 	os.Exit(exitCode)
 }
