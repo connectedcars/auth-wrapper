@@ -1,4 +1,10 @@
 steps:
+  # Make sure we have the newest docker version
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'gcr.io/cloud-builders/docker']
+  # Make sure we have the newest docker version
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'gcr.io/cloud-builders/git']
   # List docker version
   - name: 'gcr.io/cloud-builders/docker'
     args: ['version']  
