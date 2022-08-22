@@ -64,6 +64,7 @@ COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
 RUN ln -s /opt/bin/auth-wrapper /opt/bin/docker
 
 ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+RUN echo "Host *\n  StrictHostKeyChecking no" > /etc/ssh/ssh_config.d/01-hostkey-disable.conf
 
 ENV PATH=/opt/bin:${PATH}
 ENV SSH_KEY_PATH=${SSH_KEY_PATH}
