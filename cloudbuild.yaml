@@ -94,4 +94,5 @@ images: [
   'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME',
   'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME',
   'gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME'
+  'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME'
 ]
