@@ -49,9 +49,8 @@ RUN ln -s /opt/bin/auth-wrapper /opt/bin/git
 ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
 ENV PATH=/opt/bin:${PATH}
-ENV WRAP_COMMAND=git
 ENV SSH_KEY_PATH=${SSH_KEY_PATH}
-ENTRYPOINT ["/opt/bin/auth-wrapper"]
+ENTRYPOINT ["/opt/bin/git"]
 
 
 #
@@ -65,12 +64,12 @@ COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
 RUN ln -s /opt/bin/auth-wrapper /opt/bin/docker
 
 ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+RUN echo "Host *\n  StrictHostKeyChecking no" > /etc/ssh/ssh_config.d/01-hostkey-disable.conf
 
 ENV PATH=/opt/bin:${PATH}
-ENV WRAP_COMMAND=docker
 ENV SSH_KEY_PATH=${SSH_KEY_PATH}
 ENV DOCKER_BUILDKIT=1
-ENTRYPOINT ["/opt/bin/auth-wrapper"]
+ENTRYPOINT ["/opt/bin/docker"]
 
 #
 # Authwrapped git with local keys
@@ -86,6 +85,5 @@ RUN chmod 600 /build.pem
 ENV GIT_SSH_COMMAND="ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
 ENV PATH=/opt/bin:${PATH}
-ENV WRAP_COMMAND=git
 ENV SSH_KEY_PATH=/build.pem
-ENTRYPOINT ["/opt/bin/auth-wrapper"]
+ENTRYPOINT ["/opt/bin/git"]
