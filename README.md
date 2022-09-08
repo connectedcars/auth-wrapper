@@ -7,26 +7,47 @@ This can be used in:
 * CI/CD pipelines when checking code out, running package installers pulling code from private repos.
 * Auditing and restricting access to distributed SSH servers in a central location
 
-## How to use
+# Setup
 
-### Git checkout
+Add key location to your shell enviroment:
 
-Git clone with key store in Google Cloud KMS:
+Google KMS hosted key:
 
 ``` bash
 export SSH_KEY_PATH=kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1
-auth-wrapper git clone git@github.com:connectedcars/private-module.git
 ```
 
-Git clone with local key:
+Local key:
 
 ``` bash
 export SSH_KEY_PATH=build.pem
 export SSH_KEY_PASSWORD=thepassword
+```
+
+# How to use
+
+## SSH login
+
+``` bash
+auth-wrapper ssh user@ip
+auth-wrapper ssh user@ip 'echo hello'
+```
+
+## Git checkout
+
+``` bash
 auth-wrapper git clone git@github.com:connectedcars/private-module.git
 ```
 
-### SSH Certs
+## Docker build
+
+``` bash
+auth-wrapper docker build --progress=plain --ssh default .
+```
+
+# Advanced
+
+## SSH Certs
 
 Signing server:
 
@@ -76,21 +97,13 @@ To configure a SSH server to trust the signing server CA for a specific user:
 cert-authority,principals="user1,serverType:gw" ssh-rsa AAAA...(copy from output of signing server) ca key
 ```
 
+# Options
 
-## Use Examples
-```
-auth-wrapper ssh user@ip
-auth-wrapper ssh user@ip 'echo hello'
-```
-
-
-## Options
-
-### Arguments
+## Arguments
 
 * -principals : Principals to request
 
-### Environment variables
+## Environment variables
 
 Client options:
 
@@ -107,7 +120,7 @@ Signing server options:
 SHA256 Digest"
 * SSH_CA_AUTHORIZED_KEYS_PATH": Path to authorized_keys following [AUTHORIZED_KEYS_FILE_FORMAT](http://man7.org/linux/man-pages/man8/sshd.8.html#AUTHORIZED_KEYS_FILE_FORMAT)
 
-## Google Cloud KMS key setup
+# Google Cloud KMS key setup
 
 Create keyring and key:
 
@@ -120,7 +133,7 @@ gcloud kms keys create ssh-key --keyring ssh-keys --location global --default-al
 gcloud kms keys add-iam-policy-binding ssh-key --keyring=ssh-keys --location=global --member user@company.com --role roles/cloudkms.signerVerifier
 ```
 
-## Local key
+# Local key
 
 Current the go ssh key implementation does not support the new OpenSSH format so you need to use a PEM formated key:
 
@@ -129,10 +142,11 @@ ssh-keygen -f build.key
 ssh-keygen -f build.key -m 'PEM' -e > build.pem
 ```
 
-## Release new version
+# Release new version
 
 ``` bash
 export GITHUB_TOKEN="YOUR_GH_TOKEN"
 git tag -a v2.0.2 -m "Release 2.0.2"
 git push origin v2.0.2
+goreleaser release --rm-dist
 ```
