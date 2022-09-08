@@ -128,3 +128,11 @@ Current the go ssh key implementation does not support the new OpenSSH format so
 ssh-keygen -f build.key
 ssh-keygen -f build.key -m 'PEM' -e > build.pem
 ```
+
+## Release new version
+
+``` bash
+export GITHUB_TOKEN="YOUR_GH_TOKEN"
+git tag -a v2.0.2 -m "Release 2.0.2"
+git push origin v2.0.2
+```
