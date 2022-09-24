@@ -142,11 +142,95 @@ ssh-keygen -f build.key
 ssh-keygen -f build.key -m 'PEM' -e > build.pem
 ```
 
-# Release new version
+# Development
+
+## Release new version
 
 ``` bash
 export GITHUB_TOKEN="YOUR_GH_TOKEN"
 git tag -a v2.0.2 -m "Release 2.0.2"
 git push origin v2.0.2
 goreleaser release --rm-dist
+```
+
+## VSCode setup
+
+settings.json
+``` json5
+{
+    // Golang
+    "go.useCodeSnippetsOnFunctionSuggest": true,
+    "go.useLanguageServer": true,
+    "go.alternateTools": {
+        "go-languageserver": "gopls"
+    },
+    "go.buildOnSave": "off",
+    "go.vetOnSave": "off",
+    "go.useCodeSnippetsOnFunctionSuggestWithoutType": true,
+    "go.docsTool": "gogetdoc",
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    }
+}
+```
+
+launch.json
+``` json5
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/authwrapper",
+            "env": {
+                "SSH_KEY_PATH": "kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1",
+                "SSH_SIGNING_SERVER_URL": "http://localhost:3080",
+                //"SSH_PRINCIPALS": "tlb",
+
+                "SSH_SIGNING_SERVER_LISTEN_ADDRESS": ":3080",
+                "SSH_CA_KEY_PATH": "kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1",
+                "SSH_CA_AUTHORIZED_KEYS_PATH": "${workspaceFolder}/authorized_keys",
+                "SSH_SIGNING_LIFETIME": "60m",
+                
+                //"SSH_KEY_PATH": "kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1",
+                "GIT_SSH_COMMAND": "ssh -vvvv",
+                "DOCKER_BUILDKIT": "1",
+                "PROGRESS_NO_TRUNC": "1",
+                "SSH_AUTH_SOCK": ""
+            },
+            "args": [
+                "-principals", "tlb",
+                //"ssh-add", "-L"
+                "ssh", "-p", "22", "-vv", "-l" ,"tlb", "1.2.4.5", "hostname"
+                //"bash", "-c", "docker build --no-cache --progress=plain --ssh=default=$SSH_AUTH_SOCK .",
+                //"docker", "build", 
+                //"--add-host=metadata.google.internal:192.168.65.2", 
+                //"--no-cache", 
+                //"--progress=plain", 
+                //"--ssh=default=$SSH_AUTH_SOCK", 
+                //"--build-arg=WRAP_IMAGE=gcr.io/cloud-builders/docker",
+                //"--build-arg=WRAP_COMMAND=/usr/bin/docker",
+                //"--build-arg=WRAP_NAME=docker",
+                //"--build-arg=SSH_KEY_PATH=kms://projects/yourprojectname/locations/global/keyRings/yourkeyring/cryptoKeys/ssh-key/cryptoKeyVersions/1",
+                //"."
+                //"git", "clone", "git@github.com:connectedcars/private-module.git"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "Launch test function",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}/cmd/main_test.go",
+            "args": ["-test.timeout", "999s"]
+        },
+    ]
+}
 ```
