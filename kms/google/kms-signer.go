@@ -12,6 +12,7 @@ import (
 	"log"
 
 	cloudkms "cloud.google.com/go/kms/apiv1"
+	"google.golang.org/api/option"
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 )
 
@@ -56,9 +57,15 @@ var CryptoHashLookup = map[crypto.Hash]string{
 
 // NewKMSSigner creates a new instance
 func NewKMSSigner(keyName string, forceDigest bool) (signer KMSSigner, err error) {
+	// Try to find a token source in the environment
+	ts, err := FindTokenSource()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Create the KMS client.
 	ctx := context.Background()
-	client, err := cloudkms.NewKeyManagementClient(ctx)
+	client, err := cloudkms.NewKeyManagementClient(ctx, option.WithTokenSource(ts))
 	if err != nil {
 		log.Fatal(err)
 	}
