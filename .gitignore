@@ -15,3 +15,4 @@
 vendor
 /dist
 authorized_keys
+build.pem
