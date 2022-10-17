@@ -2,11 +2,14 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/connectedcars/auth-wrapper/sshagent"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -67,7 +70,21 @@ func main() {
 		}
 	}
 
-	exitCode, err := runCommandWithSSHAgent(agent, config.Command, config.Args)
+	var sshAuthSock string
+	if config.SSHAgentSocketPath != "" {
+		sshAuthSock = config.SSHAgentSocketPath
+	} else {
+		// Generate random filename
+		dir, err := ioutil.TempDir(os.TempDir(), "")
+		if err != nil {
+			log.Fatal(err)
+		}
+		sshAuthSock = dir + "/" + generateRandomString(8) + ".sock"
+	}
+
+	sshagent.StartSSHAgentServer(agent, sshAuthSock)
+
+	exitCode, err := runCommandWithSSHAgent(sshAuthSock, config.Command, config.Args)
 	if err != nil {
 		log.Fatalf("runCommandWithSSHAgent: %v", err)
 	}
@@ -76,4 +93,14 @@ func main() {
 		fmt.Fprintf(os.Stderr, "exit code: %v\n", exitCode)
 	}
 	os.Exit(exitCode)
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyz"
+
+func generateRandomString(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }
