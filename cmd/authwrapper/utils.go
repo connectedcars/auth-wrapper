@@ -17,18 +17,13 @@ import (
 
 	"github.com/connectedcars/auth-wrapper/kms/google"
 	"github.com/connectedcars/auth-wrapper/server"
-	"github.com/connectedcars/auth-wrapper/sshagent"
+
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 )
 
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
-func runCommandWithSSHAgent(agent agent.ExtendedAgent, command string, args []string) (exitCode int, err error) {
-	sshAuthSock, err := sshagent.StartSSHAgentServer(agent)
-	if err != nil {
-		return 255, fmt.Errorf("Failed to start ssh agent server: %v", err)
-	}
+func runCommandWithSSHAgent(sshAuthSock string, command string, args []string) (exitCode int, err error) {
 
 	os.Setenv("SSH_AUTH_SOCK", sshAuthSock)
 

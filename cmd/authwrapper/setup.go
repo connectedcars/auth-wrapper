@@ -30,6 +30,7 @@ type Config struct {
 	SSHCaAuthorizedKeysPath string
 	SSHSigningServerAddress string
 	SSHAgentSocket          string
+	SSHAgentSocketPath      string
 	AuthWrapperQuiet        bool
 }
 
@@ -55,6 +56,7 @@ func parseEnvironment() (*Config, error) {
 		SSHCaAuthorizedKeysPath: os.Getenv("SSH_CA_AUTHORIZED_KEYS_PATH"),
 		SSHSigningServerAddress: os.Getenv("SSH_SIGNING_SERVER_LISTEN_ADDRESS"),
 		SSHAgentSocket:          os.Getenv("SSH_AUTH_SOCK"),
+		SSHAgentSocketPath:      os.Getenv("SSH_AUTH_SOCK_PATH"),
 		AuthWrapperQuiet:        isAuthWrapperQuiet,
 	}
 	os.Unsetenv("WRAP_COMMAND")
@@ -65,6 +67,7 @@ func parseEnvironment() (*Config, error) {
 	os.Unsetenv("SSH_CA_KEY_PASSWORD")
 	os.Unsetenv("SSH_SIGNING_SERVER_LISTEN_ADDRESS")
 	os.Unsetenv("SSH_AUTH_SOCK")
+	os.Unsetenv("SSH_AUTH_SOCK_PATH")
 	os.Unsetenv("AUTH_WRAPPER_QUIET")
 
 	if *principalsFlag != "" {

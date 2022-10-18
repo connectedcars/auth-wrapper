@@ -2,9 +2,7 @@ package sshagent
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
-	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -14,14 +12,7 @@ import (
 )
 
 // StartSSHAgentServer start an SSH Agent server and loads the given private key
-func StartSSHAgentServer(sshAgent agent.Agent) (sshAuthSock string, error error) {
-	// Generate random filename
-	dir, err := ioutil.TempDir(os.TempDir(), "")
-	if err != nil {
-		log.Fatal(err)
-	}
-	sshAuthSock = dir + "/" + generateRandomString(8) + ".sock"
-
+func StartSSHAgentServer(sshAgent agent.Agent, sshAuthSock string) {
 	go func() {
 		// Open SSH agent socket
 		if err := os.RemoveAll(sshAuthSock); err != nil {
@@ -42,8 +33,6 @@ func StartSSHAgentServer(sshAgent agent.Agent) (sshAuthSock string, error error)
 			go agent.ServeAgent(sshAgent, conn)
 		}
 	}()
-
-	return sshAuthSock, err
 }
 
 // ConnectSSHAgent connects to a SSH agent socket and returns a agent.ExtendedAgent
@@ -53,16 +42,6 @@ func ConnectSSHAgent(socket string) (agent.ExtendedAgent, error) {
 		return nil, fmt.Errorf("net.Dial: %v", err)
 	}
 	return agent.NewClient(conn), nil
-}
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyz"
-
-func generateRandomString(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }
 
 // ParsePrivateSSHKey parses a private key
