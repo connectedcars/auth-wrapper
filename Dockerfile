@@ -3,7 +3,7 @@ ARG WRAP_COMMAND
 ARG SSH_KEY_PATH
 
 # Build image
-FROM gcr.io/cloud-builders/go:latest as builder
+FROM gcr.io/cloud-builders/go:latest AS builder
 
 ARG VERSION="1.0-dev"
 
@@ -25,7 +25,7 @@ RUN echo nobody:x:65534:65534:nobody:/: > password.minimal
 #
 # Auth-wrapper server image
 #
-FROM scratch as main
+FROM scratch AS main
 
 ARG SSH_KEY_PATH
 
@@ -39,7 +39,7 @@ ENTRYPOINT ["/opt/bin/auth-wrapper"]
 #
 # Authwrapped git with KMS keys
 #
-FROM gcr.io/cloud-builders/git as git-kms
+FROM gcr.io/cloud-builders/git AS git-kms
 
 ARG SSH_KEY_PATH
 
@@ -56,9 +56,11 @@ ENTRYPOINT ["/opt/bin/git"]
 #
 # Authwrapped docker with KMS keys
 #
-FROM gcr.io/cloud-builders/docker as docker-kms
+FROM gcr.io/cloud-builders/docker AS docker-kms
 
 ARG SSH_KEY_PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends docker-buildx-plugin && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
 RUN ln -s /opt/bin/auth-wrapper /opt/bin/docker
@@ -74,7 +76,7 @@ ENTRYPOINT ["/opt/bin/docker"]
 #
 # Authwrapped git with local keys
 #
-FROM gcr.io/cloud-builders/git as git-local
+FROM gcr.io/cloud-builders/git AS git-local
 
 COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
 RUN ln -s /opt/bin/auth-wrapper /opt/bin/git
