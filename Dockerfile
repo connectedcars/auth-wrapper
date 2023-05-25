@@ -60,6 +60,8 @@ FROM gcr.io/cloud-builders/docker as docker-kms
 
 ARG SSH_KEY_PATH
 
+RUN apt-get update && apt-get install -y --no-install-recommends docker-buildx-plugin && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/auth-wrapper /opt/bin/auth-wrapper
 RUN ln -s /opt/bin/auth-wrapper /opt/bin/docker
 
