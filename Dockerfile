@@ -3,7 +3,7 @@ ARG WRAP_COMMAND
 ARG SSH_KEY_PATH
 
 # Build image
-FROM gcr.io/cloud-builders/go:latest AS builder
+FROM gcr.io/cloud-builders/go:1.21 AS builder
 
 ARG VERSION="1.0-dev"
 
