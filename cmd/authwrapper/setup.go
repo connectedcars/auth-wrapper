@@ -95,6 +95,8 @@ func parseEnvironment() (*Config, error) {
 			config.Command = args[0]
 			if len(config.Args) > 1 {
 				config.Args = args[1:]
+			} else {
+				config.Args = []string{}
 			}
 		}
 	}
