@@ -26,7 +26,7 @@ steps:
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest', 
       '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:$COMMIT_SHA',
-      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:latest'
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:latest',
       '.'
       ]
   #
@@ -40,7 +40,7 @@ steps:
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:latest', 
       '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:$COMMIT_SHA',
-      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:latest'
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:latest',
       '.'
       ]
   # Test auth wrapped git using KSM key
@@ -60,7 +60,7 @@ steps:
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:latest', 
       '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:$COMMIT_SHA',
-      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:latest'
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:latest',
       '.'
       ]
   # Test auth wrapped docker using KSM key
