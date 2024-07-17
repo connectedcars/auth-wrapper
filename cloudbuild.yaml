@@ -25,6 +25,8 @@ steps:
       '--target=main',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME:latest', 
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:$COMMIT_SHA',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:latest',
       '.'
       ]
   #
@@ -37,6 +39,8 @@ steps:
       '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:latest', 
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:$COMMIT_SHA',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:latest',
       '.'
       ]
   # Test auth wrapped git using KSM key
@@ -55,6 +59,8 @@ steps:
       '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:$COMMIT_SHA', 
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME:latest', 
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:$COMMIT_SHA',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:latest',
       '.'
       ]
   # Test auth wrapped docker using KSM key
@@ -76,7 +82,10 @@ steps:
       'build', 
       '--target=git-local',
       '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME:$COMMIT_SHA', 
-      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME:latest', '.'
+      '--tag=gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME:latest',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME:$COMMIT_SHA',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME:latest',
+      '.'
       ]
   # Test auth wrapped git using local key
   - name: 'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME:$COMMIT_SHA'
@@ -94,5 +103,9 @@ images: [
   'gcr.io/$PROJECT_ID/$REPO_NAME.$BRANCH_NAME',
   'gcr.io/$PROJECT_ID/$REPO_NAME-git.$BRANCH_NAME',
   'gcr.io/$PROJECT_ID/$REPO_NAME-git-local.$BRANCH_NAME',
-  'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME'
+  'gcr.io/$PROJECT_ID/$REPO_NAME-docker.$BRANCH_NAME',
+  'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME',
+  'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME',
+  'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME',
+  'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME'
 ]
