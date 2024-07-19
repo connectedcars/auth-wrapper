@@ -1,112 +1,99 @@
 steps:
   # Make sure we have the newest docker version
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["pull", "gcr.io/cloud-builders/docker"]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'gcr.io/cloud-builders/docker']
   # Make sure we have the newest docker version
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["pull", "gcr.io/cloud-builders/git"]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'gcr.io/cloud-builders/git']
   # List docker version
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["version"]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['version']  
   # Workaround for https://github.com/moby/moby/issues/39120
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["pull", "docker/dockerfile:experimental"]
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["pull", "docker/dockerfile:1.0-experimental"]
-  - name: "gcr.io/cloud-builders/docker"
-    args: ["pull", "docker.io/library/alpine:latest"]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker/dockerfile:experimental']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker/dockerfile:1.0-experimental']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['pull', 'docker.io/library/alpine:latest']  
   #
   # Build KMS auth wrappers
   #
   # Build auth wrapped server container
-  - name: "gcr.io/cloud-builders/docker"
-    args:
-      [
-        "build",
-        "--target=main",
-        "--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:$COMMIT_SHA",
-        "--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:latest",
-        ".",
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--target=main',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:$COMMIT_SHA',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME:latest',
+      '.'
       ]
   #
   # Build auth wrapped git
   #
-  - name: "gcr.io/cloud-builders/docker"
-    args:
-      [
-        "build",
-        "--target=git-kms",
-        "--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3",
-        "--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:$COMMIT_SHA",
-        "--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:latest",
-        ".",
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--target=git-kms',
+      '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:$COMMIT_SHA',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:latest',
+      '.'
       ]
   # Test auth wrapped git using KSM key
-  - name: "europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:$COMMIT_SHA"
-    args: ["clone", "git@github.com:connectedcars/private-module.git"]
-  - name: "gcr.io/cloud-builders/git"
-    entrypoint: "bash"
-    args: ["-c", "rm -rf private-module"]
+  - name: 'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:$COMMIT_SHA'
+    args: ['clone', 'git@github.com:connectedcars/private-module.git']
+  - name: 'gcr.io/cloud-builders/git'
+    entrypoint: 'bash'
+    args: ['-c', 'rm -rf private-module']
   #
   # Build auth wrapped docker
   #
-  - name: "gcr.io/cloud-builders/docker"
-    args:
-      [
-        "build",
-        "--target=docker-kms",
-        "--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3",
-        "--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:$COMMIT_SHA",
-        "--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:latest",
-        ".",
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '--target=docker-kms',
+      '--build-arg=SSH_KEY_PATH=kms://projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/ssh-key/cryptoKeyVersions/3',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:$COMMIT_SHA',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:latest',
+      '.'
       ]
   # Test auth wrapped docker using KSM key
-  - name: "europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:$COMMIT_SHA"
-    args:
-      [
-        "build",
-        "--progress=plain",
-        "--ssh",
-        "default",
-        "resources/docker-kms-test",
-      ]
+  - name: 'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME:$COMMIT_SHA'
+    args: ['build', '--progress=plain', '--ssh', 'default', 'resources/docker-kms-test']
   #
   # Build embedded key auth wrappers
   #
   # Copy build key to workspace
-  - name: "gcr.io/cloud-builders/gsutil"
-    args:
-      [
-        "cp",
-        "gs://connectedcars-staging-cloudbuilder-private/build.pem",
-        "./build.pem",
-      ]
+  - name: 'gcr.io/cloud-builders/gsutil'
+    args: [
+            'cp',
+            'gs://connectedcars-staging-cloudbuilder-private/build.pem',
+            './build.pem'
+          ]
   # Build auth wrapper git image
-  - name: "gcr.io/cloud-builders/docker"
-    args:
-      [
-        "build",
-        "--target=git-local",
-        "--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME:$COMMIT_SHA",
-        "--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME:latest",
-        ".",
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '--target=git-local',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME:$COMMIT_SHA',
+      '--tag=europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME:latest',
+      '.'
       ]
   # Test auth wrapped git using local key
-  - name: "europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:$COMMIT_SHA"
-    args: ["clone", "git@github.com:connectedcars/private-module.git"]
+  - name: 'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME:$COMMIT_SHA'
+    args: ['clone', 'git@github.com:connectedcars/private-module.git']
     secretEnv:
-      - "SSH_KEY_PASSWORD"
-  - name: "gcr.io/cloud-builders/git"
-    entrypoint: "bash"
-    args: ["-c", "rm -rf private-module"]
+      - 'SSH_KEY_PASSWORD'
+  - name: 'gcr.io/cloud-builders/git'
+    entrypoint: 'bash'
+    args: ['-c', 'rm -rf private-module']
 secrets:
-  - kmsKeyName: projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/connectedcars-builder
-    secretEnv:
-      SSH_KEY_PASSWORD: CiQAg7wCPfO2Tf9mtZoFWjAtX7whQ481af3gyGdM9WNK26B74UkSUQBefMgeHNh0KTsGybKReXDsFcbmed7f5sw97zSe9cswpKogENM5Ye0jiIu6NfebUpCnmJ9HVHmD/yBknlW4nn1VXBs7HYGiBSFZ52i2HyEopw==
-images:
-  [
-    "europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME",
-    "europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME",
-    "europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME",
-    "europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME",
-  ]
+- kmsKeyName: projects/connectedcars-staging/locations/global/keyRings/cloudbuilder/cryptoKeys/connectedcars-builder
+  secretEnv:
+    SSH_KEY_PASSWORD: CiQAg7wCPfO2Tf9mtZoFWjAtX7whQ481af3gyGdM9WNK26B74UkSUQBefMgeHNh0KTsGybKReXDsFcbmed7f5sw97zSe9cswpKogENM5Ye0jiIu6NfebUpCnmJ9HVHmD/yBknlW4nn1VXBs7HYGiBSFZ52i2HyEopw==
+images: [
+  'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME/$BRANCH_NAME',
+  'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git/$BRANCH_NAME',
+  'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-git-local/$BRANCH_NAME',
+  'europe-west1-docker.pkg.dev/connectedcars-build/$REPO_NAME-docker/$BRANCH_NAME'
+]
